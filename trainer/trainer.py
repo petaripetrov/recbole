@@ -283,6 +283,7 @@ class Trainer(AbstractTrainer):
         valid_result = self.evaluate(
             valid_data, load_best_model=False, show_progress=show_progress
         )
+        print(valid_result)
         valid_score = calculate_valid_score(valid_result, self.valid_metric)
         return valid_score, valid_result
 

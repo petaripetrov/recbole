@@ -161,6 +161,7 @@ class Recall(TopkMetric):
 
 
 class NDCG(TopkMetric):
+    # Reuse this for tail and head nDCG. aka just take this and reduce the amount of items in used_info, rest is the same
     r"""NDCG_ (also known as normalized discounted cumulative gain) is a measure of ranking quality,
     where positions are discounted logarithmically. It accounts for the position of the hit by assigning
     higher scores to hits at top ranks.
@@ -773,3 +774,14 @@ class TailPercentage(AbstractMetric):
             key = "{}@{}".format(metric, k)
             metric_dict[key] = round(avg_result[k - 1], self.decimal_place)
         return metric_dict
+
+class TailNDCG(TopkMetric):
+    metric_need = ["rec.topk", "rec.item", "data.count_items", "data.num_items"]
+
+    def __init__(self, config):
+        super().__init__(config)
+        self.topk = config["topk"]
+        self.tail_atio = config.get("tail_ratio", 0.1)
+
+    def used_info(self, dataobject):
+        pass
