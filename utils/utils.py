@@ -67,6 +67,7 @@ def get_model(model_name):
         "sequential_recommender",
         "knowledge_aware_recommender",
         "exlib_recommender",
+        "debiased_recommender",
     ]
 
     model_file_name = model_name.lower()
