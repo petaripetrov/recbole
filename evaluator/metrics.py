@@ -201,6 +201,130 @@ class NDCG(TopkMetric):
 
         result = dcg / idcg
         return result
+    
+class TailNDCG(TopkMetric):
+    metric_need = ["rec.topk", "data.count_items"]
+    
+    def __init__(self, config):
+        super().__init__(config)
+        self.ratio = config["tail_ratio"]
+
+    def filter_items(self, dataobject, ratio=0.2):
+        total = 0
+        item_tuples = []
+        data_items = dataobject.get("data.count_items").most_common()
+
+        for _, val in data_items:
+            total += val
+
+        item_tuples = sorted(data_items, key=lambda t: t[1])
+
+        tail_map = {}
+        tail_total = 0.0
+        for key, val in item_tuples:
+            pop_ratio = val / total
+            tail_total += pop_ratio
+
+            if tail_total >= self.ratio:
+                break
+
+            tail_map[key] = pop_ratio
+
+        return tail_map
+
+    def calculate_metric(self, dataobject):
+        pos_index, _ = self.used_info(dataobject)
+        rec_items = dataobject.get(("rec.items")).numpy()
+        tail_items = self.filter_items(dataobject)
+
+        tail_set = set(tail_items)
+        tail_mask = np.isin(rec_items, list(tail_set))
+        pos_index_tail = pos_index & tail_mask
+        pos_len_tail = pos_index_tail.sum(axis=1)
+   
+        result = self.metric_info(pos_index_tail, pos_len_tail)
+        metric_dict = self.topk_result("tail_ndcg", result)
+        return metric_dict
+
+    def metric_info(self, pos_index, pos_len):
+        len_rank = np.full_like(pos_len, pos_index.shape[1])
+        idcg_len = np.where(pos_len > len_rank, len_rank, pos_len)
+
+        iranks = np.zeros_like(pos_index, dtype=np.float)
+        iranks[:, :] = np.arange(1, pos_index.shape[1] + 1)
+        idcg = np.cumsum(1.0 / np.log2(iranks + 1), axis=1)
+        for row, idx in enumerate(idcg_len):
+            idcg[row, idx:] = idcg[row, idx - 1]
+
+        ranks = np.zeros_like(pos_index, dtype=np.float)
+        ranks[:, :] = np.arange(1, pos_index.shape[1] + 1)
+        dcg = 1.0 / np.log2(ranks + 1)
+        dcg = np.cumsum(np.where(pos_index, dcg, 0), axis=1)
+
+        result = dcg / idcg
+        return result
+    
+class HeadNDCG(TopkMetric):
+    metric_need = ["rec.topk", "data.count_items"]
+    
+    def __init__(self, config):
+        super().__init__(config)
+        self.ratio = config["head_ratio"]
+
+    def filter_items(self, dataobject):
+        total = 0
+        item_tuples = []
+        data_items = dataobject.get("data.count_items").most_common()
+
+        for _, val in data_items:
+            total += val
+
+        item_tuples = sorted(data_items, key=lambda t: t[1], reverse=True)
+
+        tail_map = {}
+        tail_total = 0.0
+        for key, val in item_tuples:
+            pop_ratio = val / total
+            tail_total += pop_ratio
+
+            if tail_total >= self.ratio:
+                break
+
+            tail_map[key] = pop_ratio
+
+        return tail_map
+
+    def calculate_metric(self, dataobject):
+        pos_index, _ = self.used_info(dataobject)
+        rec_items = dataobject.get(("rec.items")).numpy()
+        tail_items = self.filter_items(dataobject)
+
+        tail_set = set(tail_items)
+        tail_mask = np.isin(rec_items, list(tail_set))
+        pos_index_tail = pos_index & tail_mask
+        pos_len_tail = pos_index_tail.sum(axis=1)
+   
+        result = self.metric_info(pos_index_tail, pos_len_tail)
+        metric_dict = self.topk_result("head_ndcg", result)
+        return metric_dict
+
+    def metric_info(self, pos_index, pos_len):
+        len_rank = np.full_like(pos_len, pos_index.shape[1])
+        idcg_len = np.where(pos_len > len_rank, len_rank, pos_len)
+
+        iranks = np.zeros_like(pos_index, dtype=np.float)
+        iranks[:, :] = np.arange(1, pos_index.shape[1] + 1)
+        idcg = np.cumsum(1.0 / np.log2(iranks + 1), axis=1)
+        for row, idx in enumerate(idcg_len):
+            idcg[row, idx:] = idcg[row, idx - 1]
+
+        ranks = np.zeros_like(pos_index, dtype=np.float)
+        ranks[:, :] = np.arange(1, pos_index.shape[1] + 1)
+        dcg = 1.0 / np.log2(ranks + 1)
+        dcg = np.cumsum(np.where(pos_index, dcg, 0), axis=1)
+
+        result = dcg / idcg
+        return result
 
 
 class Precision(TopkMetric):
@@ -774,14 +898,3 @@ class TailPercentage(AbstractMetric):
             key = "{}@{}".format(metric, k)
             metric_dict[key] = round(avg_result[k - 1], self.decimal_place)
         return metric_dict
-
-class TailNDCG(TopkMetric):
-    metric_need = ["rec.topk", "rec.item", "data.count_items", "data.num_items"]
-
-    def __init__(self, config):
-        super().__init__(config)
-        self.topk = config["topk"]
-        self.tail_atio = config.get("tail_ratio", 0.1)
-
-    def used_info(self, dataobject):
-        pass
