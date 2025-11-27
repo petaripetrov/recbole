@@ -32,6 +32,7 @@ import torch.cuda.amp as amp
 from recbole.data.interaction import Interaction
 from recbole.data.dataloader import FullSortEvalDataLoader
 from recbole.evaluator import Evaluator, Collector
+from recbole.evaluator.evaluator import FA_IREvaluator
 from recbole.utils import (
     ensure_dir,
     get_local_time,
@@ -141,7 +142,12 @@ class Trainer(AbstractTrainer):
         self.optimizer = self._build_optimizer()
         self.eval_type = config["eval_type"]
         self.eval_collector = Collector(config)
-        self.evaluator = Evaluator(config)
+        
+        if config["with_fa_ir"]:
+            self.evaluator = FA_IREvaluator(config)
+        else:
+            self.evaluator = Evaluator(config)
+        
         self.item_tensor = None
         self.tot_item_num = None
 
