@@ -54,14 +54,20 @@ class TopkMetric(AbstractMetric):
 
     def __init__(self, config):
         super().__init__(config)
-        self.topk = config["topk"]
+        # !!! DISCLAIMER !!!
+        # Often, when reranking, we need more items than the final (top-k) list contains. 
+        # For this purpose, we override metrics to use a seperate metric_top_k
+        self.topk = config["metric_top_k"]
+        self._topk = config["topk"]
 
     def used_info(self, dataobject):
         """Get the bool matrix indicating whether the corresponding item is positive
         and number of positive items for each user.
         """
         rec_mat = dataobject.get("rec.topk")
-        topk_idx, pos_len_list = torch.split(rec_mat, [max(self.topk), 1], dim=1)
+        _, K = rec_mat.shape
+        max_top_k = max(self.topk)
+        topk_idx, _ ,pos_len_list = torch.split(rec_mat, [max_top_k, K - max_top_k - 1, 1], dim=1)
         return topk_idx.to(torch.bool).numpy(), pos_len_list.squeeze(-1).numpy()
 
     def topk_result(self, metric, value):

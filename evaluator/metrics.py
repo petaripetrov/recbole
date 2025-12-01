@@ -219,7 +219,7 @@ class TailNDCG(TopkMetric):
 
         item_tuples = sorted(data_items, key=lambda t: t[1])
 
-        tail_map = {}
+        tail_set = set()
         tail_total = 0.0
         for key, val in item_tuples:
             pop_ratio = val / total
@@ -228,16 +228,16 @@ class TailNDCG(TopkMetric):
             if tail_total >= self.ratio:
                 break
 
-            tail_map[key] = pop_ratio
+            tail_set.add(key)
 
-        return tail_map
+        return tail_set
 
     def calculate_metric(self, dataobject):
         pos_index, _ = self.used_info(dataobject)
         rec_items = dataobject.get(("rec.items")).numpy()
-        tail_items = self.filter_items(dataobject)
+        rec_items = rec_items[:, :max(self.topk)]
+        tail_set = self.filter_items(dataobject)
 
-        tail_set = set(tail_items)
         tail_mask = np.isin(rec_items, list(tail_set))
         pos_index_tail = pos_index & tail_mask
         pos_len_tail = pos_index_tail.sum(axis=1)
@@ -297,6 +297,7 @@ class HeadNDCG(TopkMetric):
     def calculate_metric(self, dataobject):
         pos_index, _ = self.used_info(dataobject)
         rec_items = dataobject.get(("rec.items")).numpy()
+        rec_items = rec_items[:, :max(self.topk)]
         tail_items = self.filter_items(dataobject)
 
         tail_set = set(tail_items)
@@ -596,7 +597,7 @@ class ItemCoverage(AbstractMetric):
 
     def __init__(self, config):
         super().__init__(config)
-        self.topk = config["topk"]
+        self.topk = config["metric_top_k"]
 
     def used_info(self, dataobject):
         """Get the matrix of recommendation items and number of items in total item set"""
@@ -776,7 +777,7 @@ class GiniIndex(AbstractMetric):
 
     def __init__(self, config):
         super().__init__(config)
-        self.topk = config["topk"]
+        self.topk = config["metric_top_k"]
 
     def used_info(self, dataobject):
         """Get the matrix of recommendation items and number of items in total item set"""
