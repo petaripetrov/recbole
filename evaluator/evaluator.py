@@ -49,10 +49,12 @@ class FA_IREvaluator(object):
     """Evaluator is used to check parameter correctness, and summarize the results of all metrics."""
 
     def __init__(self, config):
+        print("Using FA_IR evaluator")
         self.config = config
         self.metrics = [metric.lower() for metric in self.config["metrics"]]
         self.metric_class = {}
         self._protected_map = None
+        self.tail_ratio = config["tail_ratio"]
 
         for metric in self.metrics:
             self.metric_class[metric] = metrics_dict[metric](self.config)
@@ -72,7 +74,7 @@ class FA_IREvaluator(object):
             prob = count / total
             covered_prob += prob
             
-            if covered_prob >= 0.5:
+            if covered_prob >= self.tail_ratio:
                 break
                         
             protected_map[item] = True
