@@ -144,7 +144,7 @@ class FA_IREvaluator(object):
             new_rank = self.fa_ir(10, orig_rank, q_g, 0.3, 0.1) # insert fa_ir here
             reranked_items[u] = np.array(new_rank)
 
-        reranked_items = torch.Tensor(reranked_items, dtype=torch.long)
+        reranked_items = torch.Tensor(reranked_items)
         dataobject.set("rec.items", reranked_items.clone())
         dataobject.set("rec.topk", reranked_items.clone())
         
