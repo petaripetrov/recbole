@@ -133,13 +133,8 @@ class FA_IREvaluator(object):
         return res
 
     def apply_fa_ir(self, dataobject: DataStruct):
-        from random import shuffle
-        # Gather relevant data
-        # Run fa_ir on recommendations
-        # Rebuild dataobject
         q_g = self.protected_map(dataobject)
         rec_items = dataobject.get("rec.items")
-        test = dataobject.get("rec.topk")
         rec_items = rec_items.numpy()
         n_users, K = rec_items.shape
         
@@ -148,13 +143,10 @@ class FA_IREvaluator(object):
             orig_rank = rec_items[u].tolist()
             new_rank = self.fa_ir(10, orig_rank, q_g, 0.3, 0.1) # insert fa_ir here
             reranked_items[u] = np.array(new_rank)
-            
-        # reranked_items = reranked_items[:, :10]
-            
-        # Override DataStruct
-        # new_data = DataStruct(dataobject.data)
-        # new_data.data["rec.items"] = reranked_items
-        dataobject.set("rec.items", torch.Tensor(reranked_items))
+
+        reranked_items = torch.Tensor(reranked_items, dtype=torch.long)
+        dataobject.set("rec.items", reranked_items.clone())
+        dataobject.set("rec.topk", reranked_items.clone())
         
         return dataobject
 
