@@ -146,7 +146,7 @@ class FA_IREvaluator(object):
 
         reranked_items = torch.Tensor(reranked_items)
         dataobject.set("rec.items", reranked_items.clone())
-        dataobject.set("rec.topk", reranked_items.clone())
+        # dataobject.set("rec.topk", reranked_items.clone()) # 
         
         return dataobject
 

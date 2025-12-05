@@ -620,6 +620,7 @@ class Trainer(AbstractTrainer):
         num_sample = 0
         for batch_idx, batched_data in enumerate(iter_data):
             num_sample += len(batched_data)
+            # TODO If the size allows, run fa_ir on the scores themselves, 
             interaction, scores, positive_u, positive_i = eval_func(batched_data)
             if self.gpu_available and show_progress:
                 iter_data.set_postfix_str(
