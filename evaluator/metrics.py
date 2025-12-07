@@ -203,7 +203,7 @@ class NDCG(TopkMetric):
         return result
     
 class TailNDCG(TopkMetric):
-    metric_need = ["rec.topk", "data.count_items"]
+    metric_need = ["rec.topk", "rec.score", "data.count_items"]
     
     def __init__(self, config):
         super().__init__(config)

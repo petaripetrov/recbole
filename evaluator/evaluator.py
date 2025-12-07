@@ -60,6 +60,8 @@ class FA_IREvaluator(object):
             self.metric_class[metric] = metrics_dict[metric](self.config)
             
     def _build_protected_map(self, dataobject):
+        # TODO Move to trainer
+        # DITTO the other fa_ir code.
         from collections import defaultdict
         count_items = dataobject.get("data.count_items").most_common()
         
@@ -104,7 +106,7 @@ class FA_IREvaluator(object):
         p_0, p_1 = [], []
 
         for entry in q:
-            if g[entry]:
+            if g[entry[0] - 1]:
                 p_1.append(entry)
             else: 
                 p_0.append(entry)
@@ -118,36 +120,34 @@ class FA_IREvaluator(object):
         while t_p + t_n < k:
             if t_p < m[t_p + t_n]:
                 t_p += 1
-                res[t_p + t_n - 1] = p_1.pop(0)
+                res[t_p + t_n - 1] = p_1.pop(0)[0]
             else:
-                p_1_el = p_1[0]
-                p_0_el = p_0[0]
+                p_1_el = p_1[0][1]
+                p_0_el = p_0[0][1]
 
                 if p_1_el >= p_0_el:
                     t_p += 1
-                    res[t_p + t_n - 1] = p_1.pop(0)
+                    res[t_p + t_n - 1] = p_1.pop(0)[0]
                 else:
                     t_n += 1
-                    res[t_p + t_n - 1] = p_0.pop(0)
+                    res[t_p + t_n - 1] = p_0.pop(0)[0]
 
         return res
 
     def apply_fa_ir(self, dataobject: DataStruct):
         q_g = self.protected_map(dataobject)
-        rec_items = dataobject.get("rec.items")
-        rec_items = rec_items.numpy()
-        n_users, K = rec_items.shape
+        rec_score = dataobject.get("rec.score")
+        n_users, K = rec_score.shape
         
         reranked_items = np.zeros((n_users, 10))
         for u in range(n_users):
-            orig_rank = rec_items[u].tolist()
+            # Perhaps use a min(or max) tree here
+            orig_rank = sorted(enumerate(rec_score[u].tolist()), key=lambda x: x[1], reverse=True)
             new_rank = self.fa_ir(10, orig_rank, q_g, 0.3, 0.1) # insert fa_ir here
             reranked_items[u] = np.array(new_rank)
 
         reranked_items = torch.Tensor(reranked_items)
         dataobject.set("rec.items", reranked_items.clone())
-        # dataobject.set("rec.topk", reranked_items.clone()) # 
-        
         return dataobject
 
     def evaluate(self, dataobject: DataStruct):
