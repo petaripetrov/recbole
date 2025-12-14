@@ -113,6 +113,8 @@ class Dataset(torch.utils.data.Dataset):
         self.n_items = self.num(self.ITEM_ID)
         self.n_users = self.num(self.USER_ID)
         self.eta = config['eta']
+        self.tail_ratio = config['tail_ratio']
+        self.head_ratio = config['head_ratio']
 
     def _from_scratch(self):
         """Load dataset from scratch.
@@ -1531,6 +1533,56 @@ class Dataset(torch.utils.data.Dataset):
             float: Sparsity of this dataset.
         """
         return 1 - self.inter_num / self.user_num / self.item_num
+    
+    @property
+    def tail_set(self):
+        """Get the tail item set. 
+        """
+        total = 0
+        counts = self.item_counter.most_common()
+
+        for _, val in counts:
+            total += val
+
+        item_tuples = sorted(counts, key=lambda t: t[1])
+        
+        tail = set()
+        tail_total = 0.0
+        for key, val in item_tuples:
+            pop_ratio = val / total
+            tail_total += pop_ratio
+            
+            if tail_total >= self.tail_ratio:
+                break
+            
+            tail.add(key)
+        
+        return tail
+    
+    @property
+    def head_set(self):
+        """Get the head item set. 
+        """
+        total = 0
+        counts = self.item_counter.most_common()
+
+        for _, val in counts:
+            total += val
+
+        item_tuples = sorted(counts, key=lambda t: t[1], reverse=True)
+        
+        head = set()
+        head_total = 0.0
+        for key, val in counts:
+            pop_ratio = val / total
+            head_total += pop_ratio
+            
+            if head_total >= self.head_ratio:
+                break
+            
+            head.add(key)
+        
+        return head
 
     def _check_field(self, *field_names):
         """Given a name of attribute, check if it's exist.

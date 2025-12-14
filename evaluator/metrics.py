@@ -203,41 +203,19 @@ class NDCG(TopkMetric):
         return result
     
 class TailNDCG(TopkMetric):
-    metric_need = ["rec.topk", "rec.score", "data.count_items"]
+    metric_need = ["rec.topk", "data.tail_set"]
     
     def __init__(self, config):
         super().__init__(config)
         self.ratio = config["tail_ratio"]
 
-    def filter_items(self, dataobject, ratio=0.2):
-        total = 0
-        item_tuples = []
-        data_items = dataobject.get("data.count_items").most_common()
-
-        for _, val in data_items:
-            total += val
-
-        item_tuples = sorted(data_items, key=lambda t: t[1])
-
-        tail_set = set()
-        tail_total = 0.0
-        for key, val in item_tuples:
-            pop_ratio = val / total
-            tail_total += pop_ratio
-
-            if tail_total >= self.ratio:
-                break
-
-            tail_set.add(key)
-
-        return tail_set
-
     def calculate_metric(self, dataobject):
+        import os
         pos_index, _ = self.used_info(dataobject)
-        rec_items = dataobject.get(("rec.items")).numpy()
+        rec_items = dataobject.get("rec.items").numpy()
         rec_items = rec_items[:, :max(self.topk)]
-        tail_set = self.filter_items(dataobject)
-
+        tail_set = dataobject.get("data.tail_set")
+        
         tail_mask = np.isin(rec_items, list(tail_set))
         pos_index_tail = pos_index & tail_mask
         pos_len_tail = pos_index_tail.sum(axis=1)
@@ -265,44 +243,20 @@ class TailNDCG(TopkMetric):
         return result
     
 class HeadNDCG(TopkMetric):
-    metric_need = ["rec.topk", "data.count_items"]
+    metric_need = ["rec.topk", "data.head_set", "data.count_items", "rec.score"] # data.count_items and rec.score is kinda necessary so it actually gets loaded into the register
     
     def __init__(self, config):
         super().__init__(config)
         self.ratio = config["head_ratio"]
 
-    def filter_items(self, dataobject):
-        total = 0
-        item_tuples = []
-        data_items = dataobject.get("data.count_items").most_common()
-
-        for _, val in data_items:
-            total += val
-
-        item_tuples = sorted(data_items, key=lambda t: t[1], reverse=True)
-
-        tail_map = {}
-        tail_total = 0.0
-        for key, val in item_tuples:
-            pop_ratio = val / total
-            tail_total += pop_ratio
-
-            if tail_total >= self.ratio:
-                break
-
-            tail_map[key] = pop_ratio
-
-        return tail_map
-
     def calculate_metric(self, dataobject):
         pos_index, _ = self.used_info(dataobject)
         rec_items = dataobject.get(("rec.items")).numpy()
         rec_items = rec_items[:, :max(self.topk)]
-        tail_items = self.filter_items(dataobject)
+        head_items = dataobject.get("data.head_set")
 
-        tail_set = set(tail_items)
-        tail_mask = np.isin(rec_items, list(tail_set))
-        pos_index_tail = pos_index & tail_mask
+        head_mask = np.isin(rec_items, list(head_items))
+        pos_index_tail = pos_index & head_mask
         pos_len_tail = pos_index_tail.sum(axis=1)
    
         result = self.metric_info(pos_index_tail, pos_len_tail)
