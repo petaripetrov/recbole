@@ -1434,6 +1434,11 @@ class Dataset(torch.utils.data.Dataset):
         elif self.pscore_method == 'nb':  # uniform & explicit feedback
             column = 'rating'
             pscore_id_full = torch.arange(6)
+        elif self.pscore_method == 'pop_bias':
+            # as defined by INSERT MASOUD'S PAPER HERE
+            column = 'item_id'
+            pscore_id_full = torch.arange(self.n_items)
+            denom = self.inter_num
         else:
             raise NotImplementedError(f'Unknown `pscore_method`: {self.pscore_method}')
 
@@ -1443,6 +1448,9 @@ class Dataset(torch.utils.data.Dataset):
 
         pscore_cnt_full = torch.zeros(pscore_id_full.shape).long()
         pscore_cnt_full[pscore_id] = pscore_cnt
+
+        if not denom:
+            denom = pscore_cnt_full.max()
 
         pscore_cnt_full = pow(pscore_cnt_full / pscore_cnt_full.max(), self.eta)
         pscore_cnt = pscore_cnt_full
@@ -1533,10 +1541,10 @@ class Dataset(torch.utils.data.Dataset):
             float: Sparsity of this dataset.
         """
         return 1 - self.inter_num / self.user_num / self.item_num
-    
+
     @property
     def tail_set(self):
-        """Get the tail item set. 
+        """Get the tail item set.
         """
         total = 0
         counts = self.item_counter.most_common()
@@ -1545,23 +1553,23 @@ class Dataset(torch.utils.data.Dataset):
             total += val
 
         item_tuples = sorted(counts, key=lambda t: t[1])
-        
+
         tail = set()
         tail_total = 0.0
         for key, val in item_tuples:
             pop_ratio = val / total
             tail_total += pop_ratio
-            
+
             if tail_total >= self.tail_ratio:
                 break
-            
+
             tail.add(key)
-        
+
         return tail
-    
+
     @property
     def head_set(self):
-        """Get the head item set. 
+        """Get the head item set.
         """
         total = 0
         counts = self.item_counter.most_common()
@@ -1570,18 +1578,18 @@ class Dataset(torch.utils.data.Dataset):
             total += val
 
         item_tuples = sorted(counts, key=lambda t: t[1], reverse=True)
-        
+
         head = set()
         head_total = 0.0
         for key, val in counts:
             pop_ratio = val / total
             head_total += pop_ratio
-            
+
             if head_total >= self.head_ratio:
                 break
-            
+
             head.add(key)
-        
+
         return head
 
     def _check_field(self, *field_names):

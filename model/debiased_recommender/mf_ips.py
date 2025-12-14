@@ -79,9 +79,8 @@ class MF_IPS(DebiasedRecommender):
         item = interaction[self.ITEM_ID]
         label = interaction[self.LABEL]
         output = self.forward(user, item)
-        
-        weight = interaction[self.PROPENSITIES].to(self.device)
-        # weight = self.propensity_score.to(self.device)[interaction[self.column].long()].to(self.device)
+
+        weight = self.propensity_score.to(self.device)[interaction[self.column].long()].to(self.device)
         loss = torch.mean(1 / (weight + 1e-7) * self.loss(output, label))
         return loss
 
