@@ -146,6 +146,7 @@ class Dataset(torch.utils.data.Dataset):
         """Initialization common field names."""
         self.uid_field = self.config["USER_ID_FIELD"]
         self.iid_field = self.config["ITEM_ID_FIELD"]
+        self.rating_field = self.config["RATING_FIELD"]
         self.label_field = self.config["LABEL_FIELD"]
         self.time_field = self.config["TIME_FIELD"]
 
@@ -1425,6 +1426,7 @@ class Dataset(torch.utils.data.Dataset):
         """
         interaction_data = self.inter_feat  # interaction for training
 
+        denom = None
         if self.pscore_method == 'item':  # item_id may not be consecutive
             column = 'item_id'
             pscore_id_full = torch.arange(self.n_items)
@@ -1439,6 +1441,15 @@ class Dataset(torch.utils.data.Dataset):
             column = 'item_id'
             pscore_id_full = torch.arange(self.n_items)
             denom = self.inter_num
+        elif self.pscore_method == 'pos_bias':
+            p_Y_O = torch.Tensor(self.p_Y_O)
+            p_Y = torch.Tensor(self.p_Y)
+            p_O = self.p_O
+
+            p_O_Y = p_Y_O / p_Y * p_O
+
+            column = 'rating'
+            return p_O_Y, column
         else:
             raise NotImplementedError(f'Unknown `pscore_method`: {self.pscore_method}')
 
@@ -1477,6 +1488,17 @@ class Dataset(torch.utils.data.Dataset):
         return self.counter(self.iid_field)
 
     @property
+    def rating_counter(self):
+        """Get the counter containing the occurrences times in ``rating_field`` of different items.
+
+        Returns:
+            Counter: Classic Python Counter
+        """
+
+        self._check_field("rating_field")
+        return Counter(self.inter_feat[self.rating_field].numpy())
+
+    @property
     def user_num(self):
         """Get the number of different tokens of ``self.uid_field``.
 
@@ -1495,6 +1517,16 @@ class Dataset(torch.utils.data.Dataset):
         """
         self._check_field("iid_field")
         return self.num(self.iid_field)
+
+    @property
+    def ratings(self):
+        """Get a set of unique tokens of ``self.rating_field``
+
+        Returns:
+            set: Set of unique tokens of ``self.rating_field``
+        """
+        self._check_field("rating_field")
+        return set(self.inter_feat[self.rating_field].tolist())
 
     @property
     def inter_num(self):
@@ -1591,6 +1623,28 @@ class Dataset(torch.utils.data.Dataset):
             head.add(key)
 
         return head
+
+    @property
+    def p_Y(self):
+        # TODO add descriptions
+        counter = self.rating_counter
+
+        total = sum(counter.values())
+        res = [0] * (len(counter) + 1)  # make it 1-indexed
+
+        for rating, count in counter.items():
+            res[int(rating)] = count / total
+
+        return res
+
+    @property
+    def p_O(self):
+        # TODO add descriptions
+        return self.inter_num / (self.user_num * self.item_num)
+
+    def set_p_Y_O(self, p_O):
+        # TODO add descriptions
+        self.p_Y_O = p_O
 
     def _check_field(self, *field_names):
         """Given a name of attribute, check if it's exist.
