@@ -197,7 +197,8 @@ def data_preparation(config, dataset):
 
     # Pass through MCAR (at least in the case of YahooR3) p_Y to the training dataset for propensity estimation
     # TODO identify the MCAR set in the config and handle this automatically
-    train_dataset.set_p_Y_O(test_dataset.p_Y)
+    if config['pscorre_method'] == 'pos_bias':
+        train_dataset.set_p_Y_O(test_dataset.p_Y)
 
     logger = getLogger()
     logger.info(

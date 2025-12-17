@@ -96,6 +96,14 @@ class Config(object):
         self._set_eval_neg_sample_args("valid")
         self._set_eval_neg_sample_args("test")
 
+    def get(self, key, default):
+        val = self[key]
+
+        if not val:
+            return default
+
+        return val
+
     def _init_parameters_category(self):
         self.parameters = dict()
         self.parameters["General"] = general_arguments
@@ -150,6 +158,8 @@ class Config(object):
         file_config_dict = dict()
         if file_list:
             for file in file_list:
+                if not file:
+                    continue
                 with open(file, "r", encoding="utf-8") as f:
                     file_config_dict.update(
                         yaml.load(f.read(), Loader=self.yaml_loader)

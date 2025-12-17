@@ -1463,7 +1463,7 @@ class Dataset(torch.utils.data.Dataset):
         if not denom:
             denom = pscore_cnt_full.max()
 
-        pscore_cnt_full = pow(pscore_cnt_full / pscore_cnt_full.max(), self.eta)
+        pscore_cnt_full = pow(pscore_cnt_full / denom, self.eta)
         pscore_cnt = pscore_cnt_full
         return pscore_cnt, column
 
