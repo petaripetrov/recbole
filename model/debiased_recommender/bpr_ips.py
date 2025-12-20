@@ -18,13 +18,13 @@ Reference:
 import torch
 import torch.nn as nn
 
-from recbole.model.abstract_recommender import GeneralRecommender
+from recbole.model.abstract_recommender import DebiasedRecommender
 from recbole.model.init import xavier_normal_initialization
 from recbole.model.loss import BPRLoss
 from recbole.utils import InputType
 
 
-class BPR_IPS(GeneralRecommender):
+class BPR_IPS(DebiasedRecommender):
     r"""BPR is a basic matrix factorization model that be trained in the pairwise way."""
 
     input_type = InputType.PAIRWISE
@@ -41,6 +41,7 @@ class BPR_IPS(GeneralRecommender):
         self.loss = BPRLoss()
 
         self.propensity_score, self.column = dataset.estimate_pscore()
+        self.use_precomp_prop = config["use_precomp_prop"]
 
         # parameters initialization
         self.apply(xavier_normal_initialization)
@@ -79,12 +80,21 @@ class BPR_IPS(GeneralRecommender):
 
         user_e, pos_e = self.forward(user, pos_item)
         neg_e = self.get_item_embedding(neg_item)
-        pos_item_score, neg_item_score = torch.mul(user_e, pos_e).sum(dim=1), torch.mul(
-            user_e, neg_e
-        ).sum(dim=1)
+        pos_item_score, neg_item_score = (
+            torch.mul(user_e, pos_e).sum(dim=1),
+            torch.mul(user_e, neg_e).sum(dim=1),
+        )
 
-        weight = self.propensity_score.to(self.device)[interaction[self.column].long()].to(self.device)
-        loss = torch.mean(1 / (weight + 1e-7) * self.loss(pos_item_score, neg_item_score))
+        if self.use_precomp_prop:
+            weight = interaction[self.PROPENSITIES]
+        else:
+            weight = self.propensity_score.to(self.device)[
+                interaction[self.column].long()
+            ].to(self.device)
+
+        loss = torch.mean(
+            1 / (weight + 1e-7) * self.loss(pos_item_score, neg_item_score)
+        )
         return loss
 
     def predict(self, interaction):

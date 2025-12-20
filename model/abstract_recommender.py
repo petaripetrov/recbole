@@ -18,8 +18,8 @@ import numpy as np
 import torch
 import torch.nn as nn
 
-from recbole.model.layers import FMEmbedding, FMFirstOrderLinear, FLEmbedding
-from recbole.utils import ModelType, InputType, FeatureSource, FeatureType, set_color
+from recbole.model.layers import FLEmbedding, FMEmbedding, FMFirstOrderLinear
+from recbole.utils import FeatureSource, FeatureType, InputType, ModelType, set_color
 
 
 class AbstractRecommender(nn.Module):
@@ -613,6 +613,7 @@ class ContextRecommender(AbstractRecommender):
         # dense_embedding shape: [batch_size, num_float_field, 2] or [batch_size, num_float_field, embed_dim] or None
         return sparse_embedding, dense_embedding
 
+
 # -*- coding: utf-8 -*-
 # @Time   : 2022/3/24
 # @Author : Jingsen Zhang
@@ -633,12 +634,12 @@ class DebiasedRecommender(AbstractRecommender):
         super(DebiasedRecommender, self).__init__()
 
         # load dataset info
-        self.USER_ID = config['USER_ID_FIELD']
-        self.ITEM_ID = config['ITEM_ID_FIELD']
-        self.PROPENSITIES = config['PROPENSITY_FIELD']
-        self.NEG_ITEM_ID = config['NEG_PREFIX'] + self.ITEM_ID
+        self.USER_ID = config["USER_ID_FIELD"]
+        self.ITEM_ID = config["ITEM_ID_FIELD"]
+        self.PROPENSITIES = config["PROPENSITY_FIELD"]
+        self.NEG_ITEM_ID = config["NEG_PREFIX"] + self.ITEM_ID
         self.n_users = dataset.num(self.USER_ID)
         self.n_items = dataset.num(self.ITEM_ID)
 
         # load parameters info
-        self.device = config['device']
+        self.device = config["device"]

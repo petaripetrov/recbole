@@ -17,14 +17,13 @@ Reference:
 
 import torch
 import torch.nn as nn
-from torch.nn.init import normal_
-
-from recbole.model.abstract_recommender import GeneralRecommender
+from recbole.model.abstract_recommender import DebiasedRecommender
 from recbole.model.layers import MLPLayers
 from recbole.utils import InputType
+from torch.nn.init import normal_
 
 
-class NeuMF_IPS(GeneralRecommender):
+class NeuMF_IPS(DebiasedRecommender):
     r"""NeuMF is an neural network enhanced matrix factorization model.
     It replace the dot product to mlp for a more precise user-item interaction.
 
@@ -99,11 +98,12 @@ class NeuMF_IPS(GeneralRecommender):
                 weight_key = "mlp_layers." + mlp_layers[index]
                 bias_key = "mlp_layers." + mlp_layers[index + 1]
                 assert (
-                    layer.weight.shape == mlp[weight_key].shape
-                ), f"mlp layer parameter shape mismatch"
-                assert (
-                    layer.bias.shape == mlp[bias_key].shape
-                ), f"mlp layer parameter shape mismatch"
+                assert layer.weight.shape == mlp[weight_key].shape, (
+                    f"mlp layer parameter shape mismatch"
+                )
+                assert layer.bias.shape == mlp[bias_key].shape, (
+                    f"mlp layer parameter shape mismatch"
+                )
                 layer.weight.data.copy_(mlp[weight_key])
                 layer.bias.data.copy_(mlp[bias_key])
                 index += 2
@@ -150,8 +150,9 @@ class NeuMF_IPS(GeneralRecommender):
 
         output = self.forward(user, item)
 
-        weight = self.propensity_score.to(self.device)[interaction[self.column].long()].to(self.device)
-        loss = torch.mean(1 / (weight + 1e-7) * self.loss(output, label))
+        weight = self.propensity_score.to(self.device)[
+            interaction[self.column].long()
+        ].to(self.device)
         return loss
 
     def predict(self, interaction):
