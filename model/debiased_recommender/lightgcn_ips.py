@@ -23,13 +23,13 @@ import numpy as np
 import scipy.sparse as sp
 import torch
 
-from recbole.model.abstract_recommender import GeneralRecommender
+from recbole.model.abstract_recommender import DebiasedRecommender
 from recbole.model.init import xavier_uniform_initialization
 from recbole.model.loss import BPRLoss, EmbLoss
 from recbole.utils import InputType
 
 
-class LightGCN(GeneralRecommender):
+class LightGCN_IPS(DebiasedRecommender):
     r"""LightGCN is a GCN-based recommender model.
 
     LightGCN includes only the most essential component in GCN — neighborhood aggregation — for
@@ -43,7 +43,7 @@ class LightGCN(GeneralRecommender):
     input_type = InputType.PAIRWISE
 
     def __init__(self, config, dataset):
-        super(LightGCN, self).__init__(config, dataset)
+        super(LightGCN_IPS, self).__init__(config, dataset)
 
         # load dataset info
         self.interaction_matrix = dataset.inter_matrix(form="coo").astype(np.float32)
@@ -53,10 +53,15 @@ class LightGCN(GeneralRecommender):
             "embedding_size"
         ]  # int type:the embedding size of lightGCN
         self.n_layers = config["n_layers"]  # int type:the layer num of lightGCN
+        # TODO ask Masoud how to handle this
         self.reg_weight = config[
             "reg_weight"
         ]  # float32 type: the weight decay for l2 normalization
         self.require_pow = config["require_pow"]
+
+        # Propensities
+        self.propensity_score, self.column = dataset.estimate_pscore()
+        self.use_precomp_prop = config["use_precomp_prop"]
 
         # define layers and loss
         self.user_embedding = torch.nn.Embedding(
@@ -185,7 +190,16 @@ class LightGCN(GeneralRecommender):
             require_pow=self.require_pow,
         )
 
+        if self.use_precomp_prop:
+            weight = interaction[self.PROPENSITIES]
+        else:
+            weight = self.propensity_score.to(self.device)[
+                interaction[self.column].long()
+            ].to(self.device)
+
         loss = mf_loss + self.reg_weight * reg_loss
+
+        loss = torch.mean((1 / (weight + 1e-7)) * loss)
 
         return loss
 
