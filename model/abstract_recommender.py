@@ -643,3 +643,34 @@ class DebiasedRecommender(AbstractRecommender):
 
         # load parameters info
         self.device = config["device"]
+
+        # Propensities
+        if "debiasing" in config:
+            self.logger.info(
+                f"Debiasing using IPS with {config['debiasing']['pscore_method']}"
+            )
+            self.with_ips = config["debiasing"]["with_ips"]
+            self.propensity_score, self.column = dataset.estimate_pscore()
+            self.use_precomp_prop = config["debiasing"]["use_precomp_prop"]
+        else:
+            self.logger.info("No debiasing")
+            self.with_ips = False
+
+    def calculate_loss(self, interaction):
+        loss = self._calculate_loss(interaction)
+
+        if not self.with_ips:
+            return loss.mean()
+
+        if self.use_precomp_prop:
+            weight = interaction[self.PROPENSITIES]
+        else:
+            weight = self.propensity_score.to(self.device)[
+                interaction[self.column].long()
+            ].to(self.device)
+
+        loss = torch.mean(1 / (weight + 1e-7) * loss)
+        return loss
+
+    def _calculate_loss(self, interaction) -> torch.Tensor:
+        raise NotImplementedError

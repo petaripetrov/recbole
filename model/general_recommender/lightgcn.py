@@ -23,13 +23,13 @@ import numpy as np
 import scipy.sparse as sp
 import torch
 
-from recbole.model.abstract_recommender import GeneralRecommender
+from recbole.model.abstract_recommender import DebiasedRecommender
 from recbole.model.init import xavier_uniform_initialization
 from recbole.model.loss import BPRLoss, EmbLoss
 from recbole.utils import InputType
 
 
-class LightGCN(GeneralRecommender):
+class LightGCN(DebiasedRecommender):
     r"""LightGCN is a GCN-based recommender model.
 
     LightGCN includes only the most essential component in GCN — neighborhood aggregation — for
@@ -154,7 +154,7 @@ class LightGCN(GeneralRecommender):
         )
         return user_all_embeddings, item_all_embeddings
 
-    def calculate_loss(self, interaction):
+    def _calculate_loss(self, interaction):
         # clear the storage variable when training
         if self.restore_user_e is not None or self.restore_item_e is not None:
             self.restore_user_e, self.restore_item_e = None, None

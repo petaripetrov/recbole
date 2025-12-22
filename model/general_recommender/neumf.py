@@ -19,12 +19,12 @@ import torch
 import torch.nn as nn
 from torch.nn.init import normal_
 
-from recbole.model.abstract_recommender import GeneralRecommender
+from recbole.model.abstract_recommender import DebiasedRecommender
 from recbole.model.layers import MLPLayers
 from recbole.utils import InputType
 
 
-class NeuMF(GeneralRecommender):
+class NeuMF(DebiasedRecommender):
     r"""NeuMF is an neural network enhanced matrix factorization model.
     It replace the dot product to mlp for a more precise user-item interaction.
 
@@ -96,12 +96,12 @@ class NeuMF(GeneralRecommender):
             if isinstance(layer, nn.Linear):
                 weight_key = "mlp_layers." + mlp_layers[index]
                 bias_key = "mlp_layers." + mlp_layers[index + 1]
-                assert (
-                    layer.weight.shape == mlp[weight_key].shape
-                ), f"mlp layer parameter shape mismatch"
-                assert (
-                    layer.bias.shape == mlp[bias_key].shape
-                ), f"mlp layer parameter shape mismatch"
+                assert layer.weight.shape == mlp[weight_key].shape, (
+                    f"mlp layer parameter shape mismatch"
+                )
+                assert layer.bias.shape == mlp[bias_key].shape, (
+                    f"mlp layer parameter shape mismatch"
+                )
                 layer.weight.data.copy_(mlp[weight_key])
                 layer.bias.data.copy_(mlp[bias_key])
                 index += 2
@@ -141,7 +141,7 @@ class NeuMF(GeneralRecommender):
             )
         return output.squeeze(-1)
 
-    def calculate_loss(self, interaction):
+    def _calculate_loss(self, interaction):
         user = interaction[self.USER_ID]
         item = interaction[self.ITEM_ID]
         label = interaction[self.LABEL]

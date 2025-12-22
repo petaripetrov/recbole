@@ -13,33 +13,34 @@ Reference:
 import torch
 import torch.nn as nn
 
+from recbole.model.abstract_recommender import DebiasedRecommender
 from recbole.model.init import xavier_normal_initialization
 from recbole.utils import InputType
-from recbole.model.abstract_recommender import DebiasedRecommender
 
 
 class MF_IPS(DebiasedRecommender):
     r"""
-        Inverse Propensity Score based on MF model.
-        We simply implemented three methods (in recbole-debias.data.dataset) to calculate Propensity Score:
-            1. User Propensity
-            2. Item Propensity
-            3. Naive Bayes (uniform) Propensity
+    Inverse Propensity Score based on MF model.
+    We simply implemented three methods (in recbole-debias.data.dataset) to calculate Propensity Score:
+        1. User Propensity
+        2. Item Propensity
+        3. Naive Bayes (uniform) Propensity
     """
+
     input_type = InputType.POINTWISE
 
     def __init__(self, config, dataset):
         super(MF_IPS, self).__init__(config, dataset)
 
-        self.LABEL = config['LABEL_FIELD']
+        self.LABEL = config["LABEL_FIELD"]
 
         # load parameters info
-        self.embedding_size = config['embedding_size']
+        self.embedding_size = config["embedding_size"]
 
         # define layers and loss
         self.user_embedding = nn.Embedding(self.n_users, self.embedding_size)
         self.item_embedding = nn.Embedding(self.n_items, self.embedding_size)
-        self.loss = nn.MSELoss(reduction='none')
+        self.loss = nn.MSELoss(reduction="none")
         self.sigmoid = nn.Sigmoid()
 
         self.propensity_score, self.column = dataset.estimate_pscore()
@@ -48,7 +49,7 @@ class MF_IPS(DebiasedRecommender):
         self.apply(xavier_normal_initialization)
 
     def get_user_embedding(self, user):
-        r""" Get a batch of user embedding tensor according to input user's id.
+        r"""Get a batch of user embedding tensor according to input user's id.
 
         Args:
             user (torch.LongTensor): The input tensor that contains user's id, shape: [batch_size, ]
@@ -59,7 +60,7 @@ class MF_IPS(DebiasedRecommender):
         return self.user_embedding(user)
 
     def get_item_embedding(self, item):
-        r""" Get a batch of item embedding tensor according to input item's id.
+        r"""Get a batch of item embedding tensor according to input item's id.
 
         Args:
             item (torch.LongTensor): The input tensor that contains item's id, shape: [batch_size, ]
@@ -80,8 +81,11 @@ class MF_IPS(DebiasedRecommender):
         label = interaction[self.LABEL]
         output = self.forward(user, item)
 
-        weight = self.propensity_score.to(self.device)[interaction[self.column].long()].to(self.device)
-        loss = torch.mean(1 / (weight + 1e-7) * self.loss(output, label))
+        weight = self.propensity_score.to(self.device)[
+            interaction[self.column].long()
+        ].to(self.device)
+        loss = self.loss(output, label)
+        loss = torch.mean(1 / (weight + 1e-7) * loss)
         return loss
 
     def predict(self, interaction):
