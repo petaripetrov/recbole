@@ -17,10 +17,11 @@ Reference:
 
 import torch
 import torch.nn as nn
+from torch.nn.init import normal_
+
 from recbole.model.abstract_recommender import DebiasedRecommender
 from recbole.model.layers import MLPLayers
 from recbole.utils import InputType
-from torch.nn.init import normal_
 
 
 class NeuMF_IPS(DebiasedRecommender):
@@ -97,7 +98,6 @@ class NeuMF_IPS(DebiasedRecommender):
             if isinstance(layer, nn.Linear):
                 weight_key = "mlp_layers." + mlp_layers[index]
                 bias_key = "mlp_layers." + mlp_layers[index + 1]
-                assert (
                 assert layer.weight.shape == mlp[weight_key].shape, (
                     f"mlp layer parameter shape mismatch"
                 )
