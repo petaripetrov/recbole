@@ -38,13 +38,16 @@ class BPRLoss(nn.Module):
         >>> output.backward()
     """
 
-    def __init__(self, gamma=1e-10):
+    def __init__(self, gamma=1e-10, reduction="mean"):
         super(BPRLoss, self).__init__()
         self.gamma = gamma
+        self.reduction = reduction
 
     def forward(self, pos_score, neg_score):
-        loss = -torch.log(self.gamma + torch.sigmoid(pos_score - neg_score)).mean()
-        return loss
+        loss = torch.log(self.gamma + torch.sigmoid(pos_score - neg_score))
+        if self.reduction == "none":
+            return -loss
+        return -loss.mean()
 
 
 class RegLoss(nn.Module):

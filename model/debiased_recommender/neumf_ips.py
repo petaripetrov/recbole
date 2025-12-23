@@ -71,7 +71,7 @@ class NeuMF_IPS(DebiasedRecommender):
         elif self.mlp_train:
             self.predict_layer = nn.Linear(self.mlp_hidden_size[-1], 1)
         self.sigmoid = nn.Sigmoid()
-        self.loss = nn.BCEWithLogitsLoss()
+        self.loss = nn.BCEWithLogitsLoss(reduction="none")
 
         self.propensity_score, self.column = dataset.estimate_pscore()
 
@@ -153,7 +153,9 @@ class NeuMF_IPS(DebiasedRecommender):
         weight = self.propensity_score.to(self.device)[
             interaction[self.column].long()
         ].to(self.device)
-        return loss
+
+        loss = self.loss(output, label)
+        return torch.mean(1 / (weight + 1e-7) * loss)
 
     def predict(self, interaction):
         user = interaction[self.USER_ID]

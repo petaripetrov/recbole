@@ -96,12 +96,12 @@ class NeuMF(GeneralRecommender):
             if isinstance(layer, nn.Linear):
                 weight_key = "mlp_layers." + mlp_layers[index]
                 bias_key = "mlp_layers." + mlp_layers[index + 1]
-                assert (
-                    layer.weight.shape == mlp[weight_key].shape
-                ), f"mlp layer parameter shape mismatch"
-                assert (
-                    layer.bias.shape == mlp[bias_key].shape
-                ), f"mlp layer parameter shape mismatch"
+                assert layer.weight.shape == mlp[weight_key].shape, (
+                    f"mlp layer parameter shape mismatch"
+                )
+                assert layer.bias.shape == mlp[bias_key].shape, (
+                    f"mlp layer parameter shape mismatch"
+                )
                 layer.weight.data.copy_(mlp[weight_key])
                 layer.bias.data.copy_(mlp[bias_key])
                 index += 2
@@ -147,7 +147,8 @@ class NeuMF(GeneralRecommender):
         label = interaction[self.LABEL]
 
         output = self.forward(user, item)
-        return self.loss(output, label)
+        loss = self.loss(output, label)
+        return loss
 
     def predict(self, interaction):
         user = interaction[self.USER_ID]

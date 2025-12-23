@@ -70,8 +70,10 @@ class LightGCN_IPS(DebiasedRecommender):
         self.item_embedding = torch.nn.Embedding(
             num_embeddings=self.n_items, embedding_dim=self.latent_dim
         )
-        self.mf_loss = BPRLoss()
-        self.reg_loss = EmbLoss()
+        self.mf_loss = BPRLoss(reduction="none")
+        self.reg_loss = (
+            EmbLoss()
+        )  # this returns only one thing when we need a matrix for the IPS
 
         # storage variables for full sort evaluation acceleration
         self.restore_user_e = None

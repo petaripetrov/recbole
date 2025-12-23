@@ -38,7 +38,7 @@ class BPR_IPS(DebiasedRecommender):
         # define layers and loss
         self.user_embedding = nn.Embedding(self.n_users, self.embedding_size)
         self.item_embedding = nn.Embedding(self.n_items, self.embedding_size)
-        self.loss = BPRLoss()
+        self.loss = BPRLoss(reduction="none")
 
         self.propensity_score, self.column = dataset.estimate_pscore()
         self.use_precomp_prop = config["use_precomp_prop"]
