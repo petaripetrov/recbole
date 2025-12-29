@@ -12,9 +12,11 @@ recbole.data.dataloader.general_dataloader
 ################################################
 """
 
+from logging import getLogger
+
 import numpy as np
 import torch
-from logging import getLogger
+
 from recbole.data.dataloader.abstract_dataloader import (
     AbstractDataLoader,
     NegSampleDataLoader,

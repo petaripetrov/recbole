@@ -71,9 +71,8 @@ class LightGCN_IPS(DebiasedRecommender):
             num_embeddings=self.n_items, embedding_dim=self.latent_dim
         )
         self.mf_loss = BPRLoss(reduction="none")
-        self.reg_loss = (
-            EmbLoss()
-        )  # this returns only one thing when we need a matrix for the IPS
+        # this returns only one thing when we need a matrix for the IPS
+        self.reg_loss = EmbLoss()
 
         # storage variables for full sort evaluation acceleration
         self.restore_user_e = None

@@ -12,25 +12,26 @@ recbole.config.configurator
 ################################
 """
 
-import re
 import os
+import re
 import sys
-import yaml
 from logging import getLogger
 from typing import Literal
 
+import yaml
+
 from recbole.evaluator import metric_types, smaller_metrics
 from recbole.utils import (
-    get_model,
     Enum,
     EvaluatorType,
-    ModelType,
     InputType,
-    general_arguments,
-    training_arguments,
-    evaluation_arguments,
+    ModelType,
     dataset_arguments,
+    evaluation_arguments,
+    general_arguments,
+    get_model,
     set_color,
+    training_arguments,
 )
 
 

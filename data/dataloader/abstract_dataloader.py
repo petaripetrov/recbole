@@ -12,15 +12,15 @@ recbole.data.dataloader.abstract_dataloader
 ################################################
 """
 
-import math
 import copy
+import math
 from logging import getLogger
 
 import torch
 
 from recbole.data.interaction import Interaction
-from recbole.utils import InputType, FeatureType, FeatureSource, ModelType
 from recbole.data.transform import construct_transform
+from recbole.utils import FeatureSource, FeatureType, InputType, ModelType
 
 start_iter = False
 
@@ -174,7 +174,7 @@ class NegSampleDataLoader(AbstractDataLoader):
             and self.neg_sample_args["sample_num"] != "none"
         ):
             raise ValueError(
-                f'`neg_sample_args` [{self.neg_sample_args["distribution"]}] is not supported!'
+                f"`neg_sample_args` [{self.neg_sample_args['distribution']}] is not supported!"
             )
 
     def _neg_sampling(self, inter_feat):

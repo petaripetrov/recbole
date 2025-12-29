@@ -14,11 +14,10 @@ recbole.sampler
 """
 
 import copy
+from collections import Counter
 
 import numpy as np
-from numpy.random import sample
 import torch
-from collections import Counter
 
 
 class AbstractSampler(object):

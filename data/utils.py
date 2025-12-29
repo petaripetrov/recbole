@@ -20,7 +20,7 @@ import warnings
 from typing import Literal
 
 from recbole.data.dataloader import *
-from recbole.sampler import KGSampler, Sampler, RepeatableSampler
+from recbole.sampler import KGSampler, RepeatableSampler, Sampler
 from recbole.utils import ModelType, ensure_dir, get_local_time, set_color
 from recbole.utils.argument_list import dataset_arguments
 
@@ -53,7 +53,7 @@ def create_dataset(config):
         dataset_class = getattr(dataset_module, type2class[model_type])
 
     default_file = os.path.join(
-        config["checkpoint_dir"], f'{config["dataset"]}-{dataset_class.__name__}.pth'
+        config["checkpoint_dir"], f"{config['dataset']}-{dataset_class.__name__}.pth"
     )
     file = config["dataset_save_path"] or default_file
     if os.path.exists(file):
@@ -84,7 +84,7 @@ def save_split_dataloaders(config, dataloaders):
     """
     ensure_dir(config["checkpoint_dir"])
     save_path = config["checkpoint_dir"]
-    saved_dataloaders_file = f'{config["dataset"]}-for-{config["model"]}-dataloader.pth'
+    saved_dataloaders_file = f"{config['dataset']}-for-{config['model']}-dataloader.pth"
     file_path = os.path.join(save_path, saved_dataloaders_file)
     logger = getLogger()
     logger.info(set_color("Saving split dataloaders into", "pink") + f": [{file_path}]")
@@ -112,7 +112,7 @@ def load_split_dataloaders(config):
 
     default_file = os.path.join(
         config["checkpoint_dir"],
-        f'{config["dataset"]}-for-{config["model"]}-dataloader.pth',
+        f"{config['dataset']}-for-{config['model']}-dataloader.pth",
     )
     dataloaders_save_path = config["dataloaders_save_path"] or default_file
     if not os.path.exists(dataloaders_save_path):
@@ -197,7 +197,7 @@ def data_preparation(config, dataset):
 
     # Pass through MCAR (at least in the case of YahooR3) p_Y to the training dataset for propensity estimation
     # TODO identify the MCAR set in the config and handle this automatically
-    if config['pscorre_method'] == 'pos_bias':
+    if config["pscorre_method"] == "pos_bias":
         train_dataset.set_p_Y_O(test_dataset.p_Y)
 
     logger = getLogger()
@@ -205,19 +205,19 @@ def data_preparation(config, dataset):
         set_color("[Training]: ", "pink")
         + set_color("train_batch_size", "cyan")
         + " = "
-        + set_color(f'[{config["train_batch_size"]}]', "yellow")
+        + set_color(f"[{config['train_batch_size']}]", "yellow")
         + set_color(" train_neg_sample_args", "cyan")
         + ": "
-        + set_color(f'[{config["train_neg_sample_args"]}]', "yellow")
+        + set_color(f"[{config['train_neg_sample_args']}]", "yellow")
     )
     logger.info(
         set_color("[Evaluation]: ", "pink")
         + set_color("eval_batch_size", "cyan")
         + " = "
-        + set_color(f'[{config["eval_batch_size"]}]', "yellow")
+        + set_color(f"[{config['eval_batch_size']}]", "yellow")
         + set_color(" eval_args", "cyan")
         + ": "
-        + set_color(f'[{config["eval_args"]}]', "yellow")
+        + set_color(f"[{config['eval_args']}]", "yellow")
     )
     return train_data, valid_data, test_data
 
@@ -310,6 +310,7 @@ def _create_sampler(
     distribution: str,
     repeatable: bool,
     alpha: float = 1.0,
+    WTD: bool = False,
     base_sampler=None,
 ):
     phases = ["train", "valid", "test"]
@@ -318,6 +319,9 @@ def _create_sampler(
         if base_sampler is not None:
             base_sampler.set_distribution(distribution)
             return base_sampler
+
+        # if WTD:
+        # sampler = WTDSampler()
         if not repeatable:
             sampler = Sampler(
                 phases,
@@ -354,12 +358,14 @@ def create_samplers(config, dataset, built_datasets):
     valid_neg_sample_args = config["valid_neg_sample_args"]
     test_neg_sample_args = config["test_neg_sample_args"]
     repeatable = config["repeatable"]
+    WTD = config["use_WTD"]
     base_sampler = _create_sampler(
         dataset,
         built_datasets,
         train_neg_sample_args["distribution"],
         repeatable,
         train_neg_sample_args["alpha"],
+        WTD,
     )
     train_sampler = base_sampler.set_phase("train") if base_sampler else None
 

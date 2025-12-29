@@ -13,9 +13,8 @@ recbole.data.dataset
 """
 
 import copy
-import pickle
 import os
-import yaml
+import pickle
 from collections import Counter, defaultdict
 from logging import getLogger
 
@@ -23,14 +22,16 @@ import numpy as np
 import pandas as pd
 import torch
 import torch.nn.utils.rnn as rnn_utils
+import yaml
 from scipy.sparse import coo_matrix
+
 from recbole.data.interaction import Interaction
 from recbole.utils import (
     FeatureSource,
     FeatureType,
+    ensure_dir,
     get_local_time,
     set_color,
-    ensure_dir,
 )
 from recbole.utils.url import (
     decide_download,
@@ -108,13 +109,13 @@ class Dataset(torch.utils.data.Dataset):
         self._from_scratch()
 
         self.pscore_method = config["pscore_method"]
-        self.ITEM_ID = config['ITEM_ID_FIELD']
-        self.USER_ID = config['USER_ID_FIELD']
+        self.ITEM_ID = config["ITEM_ID_FIELD"]
+        self.USER_ID = config["USER_ID_FIELD"]
         self.n_items = self.num(self.ITEM_ID)
         self.n_users = self.num(self.USER_ID)
-        self.eta = config['eta']
-        self.tail_ratio = config['tail_ratio']
-        self.head_ratio = config['head_ratio']
+        self.eta = config["eta"]
+        self.tail_ratio = config["tail_ratio"]
+        self.head_ratio = config["head_ratio"]
 
     def _from_scratch(self):
         """Load dataset from scratch.
@@ -804,8 +805,9 @@ class Dataset(torch.utils.data.Dataset):
                             feat[field].agg(np.concatenate), method, bucket
                         )
                         ret = np.ones_like(res)
-                        res, ret = np.split(res, split_point), np.split(
-                            ret, split_point
+                        res, ret = (
+                            np.split(res, split_point),
+                            np.split(ret, split_point),
                         )
                         feat[field] = list(zip(ret, res))
             else:
@@ -819,8 +821,9 @@ class Dataset(torch.utils.data.Dataset):
                         split_point = np.cumsum(feat[field].agg(len))[:-1]
                         res = ret = feat[field].agg(np.concatenate)
                         res = np.ones_like(ret)
-                        res, ret = np.split(res, split_point), np.split(
-                            ret, split_point
+                        res, ret = (
+                            np.split(res, split_point),
+                            np.split(ret, split_point),
                         )
                         feat[field] = list(zip(ret, res))
 
@@ -1422,36 +1425,36 @@ class Dataset(torch.utils.data.Dataset):
 
     def estimate_pscore(self):
         r"""
-            estimate the propensity score
+        estimate the propensity score
         """
         interaction_data = self.inter_feat  # interaction for training
 
         denom = None
-        if self.pscore_method == 'item':  # item_id may not be consecutive
-            column = 'item_id'
+        if self.pscore_method == "item":  # item_id may not be consecutive
+            column = "item_id"
             pscore_id_full = torch.arange(self.n_items)
-        elif self.pscore_method == 'user':
-            column = 'user_id'
+        elif self.pscore_method == "user":
+            column = "user_id"
             pscore_id_full = torch.arange(self.n_users)
-        elif self.pscore_method == 'nb':  # uniform & explicit feedback
-            column = 'rating'
+        elif self.pscore_method == "nb":  # uniform & explicit feedback
+            column = "rating"
             pscore_id_full = torch.arange(6)
-        elif self.pscore_method == 'pop_bias':
+        elif self.pscore_method == "pop_bias":
             # as defined by INSERT MASOUD'S PAPER HERE
-            column = 'item_id'
+            column = "item_id"
             pscore_id_full = torch.arange(self.n_items)
             denom = self.inter_num
-        elif self.pscore_method == 'pos_bias':
+        elif self.pscore_method == "pos_bias":
             p_Y_O = torch.Tensor(self.p_Y_O)
             p_Y = torch.Tensor(self.p_Y)
             p_O = self.p_O
 
             p_O_Y = p_Y_O / p_Y * p_O
 
-            column = 'rating'
+            column = "rating"
             return p_O_Y, column
         else:
-            raise NotImplementedError(f'Unknown `pscore_method`: {self.pscore_method}')
+            raise NotImplementedError(f"Unknown `pscore_method`: {self.pscore_method}")
 
         pscore = torch.unique(interaction_data[column], return_counts=True)
         pscore_id = pscore[0].tolist()
@@ -1576,8 +1579,7 @@ class Dataset(torch.utils.data.Dataset):
 
     @property
     def tail_set(self):
-        """Get the tail item set.
-        """
+        """Get the tail item set."""
         total = 0
         counts = self.item_counter.most_common()
 
@@ -1601,15 +1603,12 @@ class Dataset(torch.utils.data.Dataset):
 
     @property
     def head_set(self):
-        """Get the head item set.
-        """
+        """Get the head item set."""
         total = 0
         counts = self.item_counter.most_common()
 
         for _, val in counts:
             total += val
-
-        item_tuples = sorted(counts, key=lambda t: t[1], reverse=True)
 
         head = set()
         head_total = 0.0
@@ -1641,6 +1640,30 @@ class Dataset(torch.utils.data.Dataset):
     def p_O(self):
         # TODO add descriptions
         return self.inter_num / (self.user_num * self.item_num)
+
+    @property
+    def p_item(self):
+        counter = self.item_counter
+
+        total = sum(counter.values())
+        res = [0] * (len(counter) + 1)
+
+        for item, count in counter.items():
+            res[int(item)] = count / total
+
+        return res
+
+    @property
+    def p_user(self):
+        counter = self.user_counter
+
+        total = sum(counter.values())
+        res = [0] * (len(counter) + 1)
+
+        for item, count in counter.items():
+            res[int(item)] = count / total
+
+        return res
 
     def set_p_Y_O(self, p_O):
         # TODO add descriptions
@@ -2027,7 +2050,7 @@ class Dataset(torch.utils.data.Dataset):
         save_dir = self.config["checkpoint_dir"]
         ensure_dir(save_dir)
         file = os.path.join(
-            save_dir, f'{self.config["dataset"]}-{self.__class__.__name__}.pth'
+            save_dir, f"{self.config['dataset']}-{self.__class__.__name__}.pth"
         )
         self.logger.info(
             set_color("Saving filtered dataset into ", "pink") + f"[{file}]"

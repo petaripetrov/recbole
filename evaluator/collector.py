@@ -12,9 +12,13 @@ recbole.evaluator.collector
 ################################################
 """
 
-from recbole.evaluator.register import Register
-import torch
 import copy
+from logging import getLogger
+
+import torch
+
+from recbole.evaluator.register import Register
+from recbole.utils import set_color
 
 
 class DataStruct(object):
@@ -75,6 +79,7 @@ class Collector(object):
         self.full = "full" in config["eval_args"]["mode"]
         self.topk = self.config["topk"]
         self.device = self.config["device"]
+        self.logger = getLogger()
 
     def data_collect(self, train_data):
         """Collect the evaluation resource from training data.
@@ -93,9 +98,21 @@ class Collector(object):
         if self.register.need("data.count_users"):
             self.data_struct.set("data.count_users", train_data.dataset.user_counter)
         if self.register.need("data.tail_set"):
-            self.data_struct.set("data.tail_set", train_data.dataset.tail_set)
+            tail_set = train_data.dataset.tail_set
+
+            self.logger.info(
+                f"Tail set contains {set_color(str(len(tail_set)), 'blue')} items."
+            )
+
+            self.data_struct.set("data.tail_set", tail_set)
         if self.register.need("data.head_set"):
-            self.data_struct.set("data.head_set", train_data.dataset.head_set)
+            head_set = train_data.dataset.head_set
+
+            self.logger.info(
+                f"Head set contains {set_color(str(len(head_set)), 'blue')} items."
+            )
+
+            self.data_struct.set("data.head_set", head_set)
 
     def _average_rank(self, scores):
         """Get the ranking of an ordered tensor, and take the average of the ranking for positions with equal values.
@@ -153,7 +170,6 @@ class Collector(object):
             positive_i(Torch.Tensor): the positive item id for each user.
         """
         if self.register.need("rec.items"):
-
             # get topk
             _, topk_idx = torch.topk(
                 scores_tensor, max(self.topk), dim=-1
@@ -161,7 +177,6 @@ class Collector(object):
             self.data_struct.update_tensor("rec.items", topk_idx)
 
         if self.register.need("rec.topk"):
-
             _, topk_idx = torch.topk(
                 scores_tensor, max(self.topk), dim=-1
             )  # n_users x k
@@ -173,7 +188,6 @@ class Collector(object):
             self.data_struct.update_tensor("rec.topk", result)
 
         if self.register.need("rec.meanrank"):
-
             desc_scores, desc_index = torch.sort(scores_tensor, dim=-1, descending=True)
 
             # get the index of positive items in the ranking list
@@ -192,7 +206,6 @@ class Collector(object):
             self.data_struct.update_tensor("rec.meanrank", result)
 
         if self.register.need("rec.score"):
-
             self.data_struct.update_tensor("rec.score", scores_tensor)
 
         if self.register.need("data.label"):
@@ -229,10 +242,12 @@ class Collector(object):
         """
         for key in self.data_struct._data_dict:
             if isinstance(self.data_struct._data_dict[key], torch.Tensor):
-                self.data_struct._data_dict[key] = self.data_struct._data_dict[key].cpu()
-                
+                self.data_struct._data_dict[key] = self.data_struct._data_dict[
+                    key
+                ].cpu()
+
                 continue
-                 
+
             self.data_struct._data_dict[key] = self.data_struct._data_dict[key]
         returned_struct = copy.deepcopy(self.data_struct)
         for key in ["rec.topk", "rec.meanrank", "rec.score", "rec.items", "data.label"]:
