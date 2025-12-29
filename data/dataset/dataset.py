@@ -118,6 +118,7 @@ class Dataset(torch.utils.data.Dataset):
         self.head_ratio = config["head_ratio"]
 
         if config["use_WTD"]:
+            # Perhaps we should calculate the tail and head sets ahead of time in case WTD is messing with this too much
             self.logger.info("Sampling dataset with WTD.")
             self.splits_map = config["splits_map"]
 
