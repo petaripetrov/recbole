@@ -117,6 +117,10 @@ class Dataset(torch.utils.data.Dataset):
         self.tail_ratio = config["tail_ratio"]
         self.head_ratio = config["head_ratio"]
 
+        if config["use_WTD"]:
+            self.logger.info("Sampling dataset with WTD.")
+            self.splits_map = config["splits_map"]
+
     def _from_scratch(self):
         """Load dataset from scratch.
         Initialize attributes firstly, then load data from atomic files, pre-process the dataset lastly.
@@ -2398,3 +2402,51 @@ class Dataset(torch.utils.data.Dataset):
                     ]
                     new_data[k] = rnn_utils.pad_sequence(seq_data, batch_first=True)
         return Interaction(new_data)
+
+    def apply_WTD(self):
+        u_all = self.inter_feat["user_id"].to_numpy()
+        i_all = self.inter_feat["item_id"].to_numpy()
+
+        if False:
+            # For some reason this works like shit and kneecaps the tail and head sets
+            # TODO fix
+            mask = {
+                key.item(): val
+                for key, val in self.field2token_id["intervene_mask"].items()
+            }
+
+            MNAR = self.inter_feat[self.inter_feat["intervene_mask"] == mask["False"]]
+            MAR = self.inter_feat[self.inter_feat["intervene_mask"] == mask["True"]]
+
+            p_user_mnar, p_item_mnar = self._calc_set_probs(MNAR)
+            p_user_mar, p_item_mar = self._calc_set_probs(MAR)
+        else:
+            self.logger.warning("Using WTD_H (MAR ~ |1/N|).")
+
+            n_u = self.user_num
+            n_i = self.item_num
+
+            p_user_mnar, p_item_mnar = self._calc_set_probs(self.inter_feat)
+            p_user_mar, p_item_mar = np.ones(n_u) / n_u, np.ones(n_i) / n_i
+
+        w = (p_user_mar[u_all] * p_item_mar[i_all] ** 2) / (
+            p_user_mnar[u_all] * p_item_mnar[i_all] ** 2
+        )
+
+        w = w / w.sum()
+
+        idx = np.random.choice(len(w), size=len(w), replace=True, p=w)
+
+        new_inter = self.inter_feat.iloc[idx].reset_index(drop=True)
+        self.inter_feat = new_inter
+
+    def _calc_set_probs(self, data: pd.DataFrame, eps=1e-12):
+        u = data["user_id"].to_numpy()
+        i = data["item_id"].to_numpy()
+
+        user_counts = np.bincount(u, minlength=self.user_num)
+        item_counts = np.bincount(i, minlength=self.item_num)
+
+        return np.clip(user_counts / user_counts.sum(), eps, None), np.clip(
+            item_counts / item_counts.sum(), eps, None
+        )
