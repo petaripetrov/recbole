@@ -310,7 +310,6 @@ def _create_sampler(
     distribution: str,
     repeatable: bool,
     alpha: float = 1.0,
-    WTD: bool = False,
     base_sampler=None,
 ):
     phases = ["train", "valid", "test"]
@@ -319,9 +318,6 @@ def _create_sampler(
         if base_sampler is not None:
             base_sampler.set_distribution(distribution)
             return base_sampler
-
-        # if WTD:
-        # sampler = WTDSampler()
         if not repeatable:
             sampler = Sampler(
                 phases,
@@ -358,14 +354,12 @@ def create_samplers(config, dataset, built_datasets):
     valid_neg_sample_args = config["valid_neg_sample_args"]
     test_neg_sample_args = config["test_neg_sample_args"]
     repeatable = config["repeatable"]
-    WTD = config["use_WTD"]
     base_sampler = _create_sampler(
         dataset,
         built_datasets,
         train_neg_sample_args["distribution"],
         repeatable,
         train_neg_sample_args["alpha"],
-        WTD,
     )
     train_sampler = base_sampler.set_phase("train") if base_sampler else None
 
