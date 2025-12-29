@@ -11,12 +11,13 @@
 recbole.quick_start
 ########################
 """
+
 import logging
 import sys
-import torch.distributed as dist
 from collections.abc import MutableMapping
 from logging import getLogger
 
+import torch.distributed as dist
 from ray import tune
 
 from recbole.config import Config
@@ -26,13 +27,13 @@ from recbole.data import (
 )
 from recbole.data.transform import construct_transform
 from recbole.utils import (
-    init_logger,
+    get_environment,
+    get_flops,
     get_model,
     get_trainer,
+    init_logger,
     init_seed,
     set_color,
-    get_flops,
-    get_environment,
 )
 
 
@@ -128,6 +129,9 @@ def run_recbole(
     # dataset filtering
     dataset = create_dataset(config)
     logger.info(dataset)
+
+    if config["use_WTD"]:
+        dataset.apply_WTD()
 
     # dataset splitting
     train_data, valid_data, test_data = data_preparation(config, dataset)
