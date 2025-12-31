@@ -48,6 +48,7 @@ def run(
     ip="localhost",
     port="5678",
     group_offset=0,
+    log_dir="./log/",
 ):
     if nproc == 1 and world_size <= 0:
         res = run_recbole(
@@ -56,6 +57,7 @@ def run(
             config_file_list=config_file_list,
             config_dict=config_dict,
             saved=saved,
+            log_dir=log_dir,
         )
     else:
         if world_size == -1:
@@ -100,6 +102,7 @@ def run_recbole(
     config_dict=None,
     saved=True,
     queue=None,
+    log_dir="./log/",
 ):
     r"""A fast running api, which includes the complete process of
     training and testing a model on a specified dataset
@@ -121,7 +124,7 @@ def run_recbole(
     )
     init_seed(config["seed"], config["reproducibility"])
     # logger initialization
-    init_logger(config)
+    init_logger(config, log_dir)
     logger = getLogger()
     logger.info(sys.argv)
     logger.info(config)

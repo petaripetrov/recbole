@@ -18,13 +18,15 @@ recbole.utils.logger
 ###############################
 """
 
+import hashlib
 import logging
 import os
-import colorlog
 import re
-import hashlib
-from recbole.utils.utils import get_local_time, ensure_dir
+
+import colorlog
 from colorama import init
+
+from recbole.utils.utils import ensure_dir, get_local_time
 
 log_colors_config = {
     "DEBUG": "cyan",
@@ -57,7 +59,7 @@ def set_color(log, color, highlight=True):
     return prev_log + log + "\033[0m"
 
 
-def init_logger(config):
+def init_logger(config, log_dir):
     """
     A logger that can show a message on standard output and write it into the
     file named `filename` simultaneously.
@@ -72,7 +74,8 @@ def init_logger(config):
         >>> logger.info(train_result)
     """
     init(autoreset=True)
-    LOGROOT = "./log/"
+    LOGROOT = log_dir
+
     dir_name = os.path.dirname(LOGROOT)
     ensure_dir(dir_name)
     model_name = os.path.join(dir_name, config["model"])
