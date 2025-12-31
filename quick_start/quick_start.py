@@ -128,10 +128,10 @@ def run_recbole(
 
     # dataset filtering
     dataset = create_dataset(config)
-    logger.info(dataset)
+    # Build head and tail set before applying any dataset modification (i.e. WTD)
+    dataset.build_rel_sets()
 
-    if config["use_WTD"]:
-        dataset.apply_WTD()
+    logger.info(dataset)
 
     # dataset splitting
     train_data, valid_data, test_data = data_preparation(config, dataset)
