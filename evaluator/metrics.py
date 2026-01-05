@@ -22,15 +22,15 @@ set of user(u)-item(i) pairs, :math:`\hat r_{u i}` represents the score predicte
 
 """
 
+from collections import Counter
 from logging import getLogger
 
 import numpy as np
-from collections import Counter
 from sklearn.metrics import auc as sk_auc
 from sklearn.metrics import mean_absolute_error, mean_squared_error
 
+from recbole.evaluator.base_metric import AbstractMetric, LossMetric, TopkMetric
 from recbole.evaluator.utils import _binary_clf_curve
-from recbole.evaluator.base_metric import AbstractMetric, TopkMetric, LossMetric
 from recbole.utils import EvaluatorType
 
 # TopK Metrics
@@ -201,25 +201,25 @@ class NDCG(TopkMetric):
 
         result = dcg / idcg
         return result
-    
+
+
 class TailNDCG(TopkMetric):
-    metric_need = ["rec.topk", "data.tail_set"]
-    
+    metric_need = ["rec.topk", "rec.items", "data.tail_set", "data.prot_map"]
+
     def __init__(self, config):
         super().__init__(config)
         self.ratio = config["tail_ratio"]
 
     def calculate_metric(self, dataobject):
-        import os
         pos_index, _ = self.used_info(dataobject)
         rec_items = dataobject.get("rec.items").numpy()
-        rec_items = rec_items[:, :max(self.topk)]
+        rec_items = rec_items[:, : max(self.topk)]
         tail_set = dataobject.get("data.tail_set")
-        
+
         tail_mask = np.isin(rec_items, list(tail_set))
         pos_index_tail = pos_index & tail_mask
         pos_len_tail = pos_index_tail.sum(axis=1)
-   
+
         result = self.metric_info(pos_index_tail, pos_len_tail)
         metric_dict = self.topk_result("tail_ndcg", result)
         return metric_dict
@@ -241,10 +241,17 @@ class TailNDCG(TopkMetric):
 
         result = dcg / idcg
         return result
-    
+
+
 class HeadNDCG(TopkMetric):
-    metric_need = ["rec.topk", "data.head_set", "data.count_items", "rec.score"] # data.count_items and rec.score is kinda necessary so it actually gets loaded into the register
-    
+    metric_need = [
+        "rec.topk",
+        "data.head_set",
+        "data.count_items",
+        "rec.score",
+        "rec.items",
+    ]  # data.count_items and rec.score is kinda necessary so it actually gets loaded into the register
+
     def __init__(self, config):
         super().__init__(config)
         self.ratio = config["head_ratio"]
@@ -252,13 +259,13 @@ class HeadNDCG(TopkMetric):
     def calculate_metric(self, dataobject):
         pos_index, _ = self.used_info(dataobject)
         rec_items = dataobject.get(("rec.items")).numpy()
-        rec_items = rec_items[:, :max(self.topk)]
+        rec_items = rec_items[:, : max(self.topk)]
         head_items = dataobject.get("data.head_set")
 
         head_mask = np.isin(rec_items, list(head_items))
         pos_index_tail = pos_index & head_mask
         pos_len_tail = pos_index_tail.sum(axis=1)
-   
+
         result = self.metric_info(pos_index_tail, pos_len_tail)
         metric_dict = self.topk_result("head_ndcg", result)
         return metric_dict
@@ -343,8 +350,9 @@ class GAUC(AbstractMetric):
     def calculate_metric(self, dataobject):
         mean_rank = dataobject.get("rec.meanrank").numpy()
         pos_rank_sum, user_len_list, pos_len_list = np.split(mean_rank, 3, axis=1)
-        user_len_list, pos_len_list = user_len_list.squeeze(-1), pos_len_list.squeeze(
-            -1
+        user_len_list, pos_len_list = (
+            user_len_list.squeeze(-1),
+            pos_len_list.squeeze(-1),
         )
         result = self.metric_info(pos_rank_sum, user_len_list, pos_len_list)
         return {"gauc": round(result, self.decimal_place)}

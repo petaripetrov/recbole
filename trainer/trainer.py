@@ -142,11 +142,7 @@ class Trainer(AbstractTrainer):
         self.optimizer = self._build_optimizer()
         self.eval_type = config["eval_type"]
         self.eval_collector = Collector(config)
-
-        if config["fairness"]["with_fa_ir"]:
-            self.evaluator = FA_IREvaluator(config)
-        else:
-            self.evaluator = Evaluator(config)
+        self.evaluator = Evaluator(config)
 
         self.item_tensor = None
         self.tot_item_num = None

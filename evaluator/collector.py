@@ -18,6 +18,7 @@ from logging import getLogger
 import torch
 
 from recbole.evaluator.register import Register
+from recbole.evaluator.utils import apply_fa_ir
 from recbole.utils import set_color
 
 
@@ -114,6 +115,9 @@ class Collector(object):
 
             self.data_struct.set("data.head_set", head_set)
 
+        if self.register.need("data.prot_map"):
+            self.data_struct.set("data.prot_map", train_data.dataset.protected_map)
+
     def _average_rank(self, scores):
         """Get the ranking of an ordered tensor, and take the average of the ranking for positions with equal values.
 
@@ -171,15 +175,25 @@ class Collector(object):
         """
         if self.register.need("rec.items"):
             # get topk
-            _, topk_idx = torch.topk(
-                scores_tensor, max(self.topk), dim=-1
-            )  # n_users x k
+            if self.config["fairness"]["with_fa_ir"]:
+                prot_map = self.data_struct.get("data.prot_map")
+                topk_idx = apply_fa_ir(scores_tensor, max(self.topk), prot_map)
+            else:
+                _, topk_idx = torch.topk(
+                    scores_tensor, max(self.topk), dim=-1
+                )  # n_users x k
+            # TODO apply FA*IR here, we need access to the prot object and scores and we should be good
             self.data_struct.update_tensor("rec.items", topk_idx)
 
         if self.register.need("rec.topk"):
-            _, topk_idx = torch.topk(
-                scores_tensor, max(self.topk), dim=-1
-            )  # n_users x k
+            if self.config["fairness"]["with_fa_ir"]:
+                prot_map = self.data_struct.get("data.prot_map")
+                topk_idx = apply_fa_ir(scores_tensor, max(self.topk), prot_map)
+            else:
+                _, topk_idx = torch.topk(
+                    scores_tensor, max(self.topk), dim=-1
+                )  # n_users x k
+            # TODO apply FA*IR here
             pos_matrix = torch.zeros_like(scores_tensor, dtype=torch.int)
             pos_matrix[positive_u, positive_i] = 1
             pos_len_list = pos_matrix.sum(dim=1, keepdim=True)
