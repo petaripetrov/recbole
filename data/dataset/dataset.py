@@ -116,12 +116,16 @@ class Dataset(torch.utils.data.Dataset):
         self.eta = config["eta"]
         self.tail_ratio = config["tail_ratio"]
         self.head_ratio = config["head_ratio"]
+        self.build_protected_map = False
 
         if config["use_WTD"]:
             # TODO perhaps we should calculate the tail and head sets ahead of time in case WTD is messing with this too much
             self.logger.info("Sampling dataset with WTD.")
             self.splits_map = config["splits_map"]
             self._build_WTD_w()
+
+        if "fairness" in config:
+            self.build_protected_map = True
 
     def _from_scratch(self):
         """Load dataset from scratch.
@@ -2406,6 +2410,15 @@ class Dataset(torch.utils.data.Dataset):
     def build_rel_sets(self):
         self.tail_set = self._calc_tail_set()
         self.head_set = self._calc_head_set()
+
+        if self.build_protected_map:
+            protected_map = torch.zeros(self.item_num, dtype=torch.int64)
+
+            for i in range(self.item_num):
+                if i + 1 in self.tail_set:
+                    protected_map[i] = 1
+
+            self.protected_map = protected_map
 
     def apply_WTD(self):
         w = self.WTD_w[: self.inter_num]

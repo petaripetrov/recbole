@@ -18,35 +18,35 @@ recbole.trainer.trainer
 """
 
 import os
-
 from logging import getLogger
 from time import time
 
 import numpy as np
 import torch
+import torch.cuda.amp as amp
+import torch.nn.functional as F
 import torch.optim as optim
+from torch.nn.parallel import DistributedDataParallel
 from torch.nn.utils.clip_grad import clip_grad_norm_
 from tqdm import tqdm
-import torch.cuda.amp as amp
 
-from recbole.data.interaction import Interaction
 from recbole.data.dataloader import FullSortEvalDataLoader
-from recbole.evaluator import Evaluator, Collector
+from recbole.data.interaction import Interaction
+from recbole.evaluator import Collector, Evaluator
 from recbole.evaluator.evaluator import FA_IREvaluator
 from recbole.utils import (
-    ensure_dir,
-    get_local_time,
-    early_stopping,
-    calculate_valid_score,
-    dict2str,
     EvaluatorType,
     KGDataLoaderState,
+    WandbLogger,
+    calculate_valid_score,
+    dict2str,
+    early_stopping,
+    ensure_dir,
+    get_gpu_usage,
+    get_local_time,
     get_tensorboard,
     set_color,
-    get_gpu_usage,
-    WandbLogger,
 )
-from torch.nn.parallel import DistributedDataParallel
 
 
 class AbstractTrainer(object):
@@ -142,12 +142,12 @@ class Trainer(AbstractTrainer):
         self.optimizer = self._build_optimizer()
         self.eval_type = config["eval_type"]
         self.eval_collector = Collector(config)
-        
-        if config["with_fa_ir"]:
+
+        if config["fairness"]["with_fa_ir"]:
             self.evaluator = FA_IREvaluator(config)
         else:
             self.evaluator = Evaluator(config)
-        
+
         self.item_tensor = None
         self.tot_item_num = None
 
@@ -327,7 +327,12 @@ class Trainer(AbstractTrainer):
         """
         resume_file = str(resume_file)
         self.saved_model_file = resume_file
-        checkpoint = torch.load(resume_file, map_location=self.device, weights_only=False)
+        checkpoint = torch.load(
+            resume_file, map_location=self.device, weights_only=False
+        )
+        checkpoint = torch.load(
+            resume_file, map_location=self.device, weights_only=False
+        )
         self.start_epoch = checkpoint["epoch"] + 1
         self.cur_step = checkpoint["cur_step"]
         self.best_valid_score = checkpoint["best_valid_score"]
@@ -436,6 +441,10 @@ class Trainer(AbstractTrainer):
             self._save_checkpoint(-1, verbose=verbose)
 
         self.eval_collector.data_collect(train_data)
+
+        if self.config["fairness"]["equalize_attention"]:
+            self.protected_map = train_data.dataset.protected_map
+
         if self.config["train_neg_sample_args"].get("dynamic", False):
             train_data.get_model(self.model)
         valid_step = 0
@@ -587,8 +596,9 @@ class Trainer(AbstractTrainer):
 
         if load_best_model:
             checkpoint_file = model_file or self.saved_model_file
-            checkpoint = torch.load(checkpoint_file, map_location=self.device, weights_only=False)
-            self.model.load_state_dict(checkpoint["state_dict"])
+            checkpoint = torch.load(
+                checkpoint_file, map_location=self.device, weights_only=False
+            )
             self.model.load_other_parameter(checkpoint.get("other_parameter"))
             message_output = "Loading model structure and parameters from {}".format(
                 checkpoint_file
@@ -620,15 +630,20 @@ class Trainer(AbstractTrainer):
         num_sample = 0
         for batch_idx, batched_data in enumerate(iter_data):
             num_sample += len(batched_data)
-            # TODO If the size allows, run fa_ir on the scores themselves, 
+            # TODO If the size allows, run fa_ir on the scores themselves,
             interaction, scores, positive_u, positive_i = eval_func(batched_data)
             if self.gpu_available and show_progress:
                 iter_data.set_postfix_str(
                     set_color("GPU RAM: " + get_gpu_usage(self.device), "yellow")
                 )
+
+            if self.config["fairness"]["equalize_attention"]:
+                scores = self.equalize_attention(scores, self.protected_map, 2)
+
             self.eval_collector.eval_batch_collect(
                 scores, interaction, positive_u, positive_i
             )
+
         self.eval_collector.model_collect(self.model)
         struct = self.eval_collector.get_data_struct()
         result = self.evaluator.evaluate(struct)
@@ -636,6 +651,33 @@ class Trainer(AbstractTrainer):
             result = self._map_reduce(result, num_sample)
         self.wandblogger.log_eval_metrics(result, head="eval")
         return result
+
+    @torch.no_grad()
+    def equalize_attention(self, scores, protected_map, num_groups, eps=1e-12):
+        valid_mask = torch.isfinite(scores)
+
+        scores_masked = scores.clone()
+        scores_masked[~valid_mask] = -eps
+
+        attention = F.softmax(scores_masked, dim=1)
+        attention = attention * valid_mask.float()
+
+        item_attention = attention.sum(dim=0)
+
+        group_attention = torch.zeros(num_groups, device=scores.device)
+        group_attention.scatter_add_(0, protected_map, item_attention)
+
+        total_attention = group_attention.sum()
+        target = total_attention / num_groups
+
+        correction = target / (group_attention + eps)
+
+        log_c = torch.log(correction)
+        item_bias = log_c[protected_map]
+
+        corrected_scores = scores + item_bias.unsqueeze(0)
+
+        return corrected_scores
 
     def _map_reduce(self, result, num_sample):
         gather_result = {}
