@@ -197,6 +197,7 @@ class Collector(object):
             pos_matrix = torch.zeros_like(scores_tensor, dtype=torch.int)
             pos_matrix[positive_u, positive_i] = 1
             pos_len_list = pos_matrix.sum(dim=1, keepdim=True)
+            topk_idx = topk_idx.to(pos_matrix.device)
             pos_idx = torch.gather(pos_matrix, dim=1, index=topk_idx)
             result = torch.cat((pos_idx, pos_len_list), dim=1)
             self.data_struct.update_tensor("rec.topk", result)
