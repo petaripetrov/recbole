@@ -665,6 +665,7 @@ class Trainer(AbstractTrainer):
         item_attention = attention.sum(dim=0)
 
         group_attention = torch.zeros(num_groups, device=scores.device)
+        protected_map = torch.Tensor(protected_map, device=scores.device)
         group_attention.scatter_add_(0, protected_map, item_attention)
 
         total_attention = group_attention.sum()
