@@ -54,11 +54,7 @@ class TopkMetric(AbstractMetric):
 
     def __init__(self, config):
         super().__init__(config)
-        # !!! DISCLAIMER !!!
-        # Often, when reranking, we need more items than the final (top-k) list contains. 
-        # For this purpose, we override metrics to use a seperate metric_top_k
-        self.topk = config["metric_top_k"]
-        self._topk = config["topk"]
+        self.topk = config["topk"]
 
     def used_info(self, dataobject):
         """Get the bool matrix indicating whether the corresponding item is positive

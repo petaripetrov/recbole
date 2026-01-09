@@ -23,13 +23,13 @@ import numpy as np
 import scipy.sparse as sp
 import torch
 
-from recbole.model.abstract_recommender import GeneralRecommender
+from recbole.model.abstract_recommender import DebiasedRecommender
 from recbole.model.init import xavier_uniform_initialization
 from recbole.model.loss import BPRLoss, EmbLoss
 from recbole.utils import InputType
 
 
-class LightGCN(GeneralRecommender):
+class LightGCN(DebiasedRecommender):
     r"""LightGCN is a GCN-based recommender model.
 
     LightGCN includes only the most essential component in GCN — neighborhood aggregation — for
@@ -53,20 +53,27 @@ class LightGCN(GeneralRecommender):
             "embedding_size"
         ]  # int type:the embedding size of lightGCN
         self.n_layers = config["n_layers"]  # int type:the layer num of lightGCN
+        # TODO ask Masoud how to handle this
         self.reg_weight = config[
             "reg_weight"
         ]  # float32 type: the weight decay for l2 normalization
         self.require_pow = config["require_pow"]
 
-        # define layers and loss
         self.user_embedding = torch.nn.Embedding(
             num_embeddings=self.n_users, embedding_dim=self.latent_dim
         )
         self.item_embedding = torch.nn.Embedding(
             num_embeddings=self.n_items, embedding_dim=self.latent_dim
         )
-        self.mf_loss = BPRLoss()
-        self.reg_loss = EmbLoss()
+
+        if config["bias"]["use_IPS"]:
+            self.mf_loss = BPRLoss(reduction="none")
+            # this returns only one thing when we need a matrix for the IPS
+            self.reg_loss = EmbLoss()
+        else:
+            self.mf_loss = BPRLoss()
+            # this returns only one thing when we need a matrix for the IPS
+            self.reg_loss = EmbLoss()
 
         # storage variables for full sort evaluation acceleration
         self.restore_user_e = None
@@ -154,7 +161,7 @@ class LightGCN(GeneralRecommender):
         )
         return user_all_embeddings, item_all_embeddings
 
-    def calculate_loss(self, interaction):
+    def _calculate_loss(self, interaction):
         # clear the storage variable when training
         if self.restore_user_e is not None or self.restore_item_e is not None:
             self.restore_user_e, self.restore_item_e = None, None

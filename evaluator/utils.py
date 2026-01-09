@@ -136,9 +136,11 @@ def apply_fa_ir(scores, k, q_g):
 
     for u in range(n_users):
         # Perhaps use a min(or max) tree here
+        # Perhaps only take the top 200-300 items
         orig_rank = sorted(
             enumerate(scores[u].tolist()), key=lambda x: x[1], reverse=True
         )
+        # Perhaps 
         new_rank = fa_ir(k, orig_rank, q_g, 0.3, 0.1)  # insert fa_ir here
         reranked_items[u] = np.array(new_rank)
     reranked_items = torch.tensor(reranked_items, dtype=torch.int64)

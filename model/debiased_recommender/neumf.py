@@ -24,7 +24,7 @@ from recbole.model.layers import MLPLayers
 from recbole.utils import InputType
 
 
-class NeuMF_IPS(DebiasedRecommender):
+class NeuMF(DebiasedRecommender):
     r"""NeuMF is an neural network enhanced matrix factorization model.
     It replace the dot product to mlp for a more precise user-item interaction.
 
@@ -37,7 +37,7 @@ class NeuMF_IPS(DebiasedRecommender):
     input_type = InputType.POINTWISE
 
     def __init__(self, config, dataset):
-        super(NeuMF_IPS, self).__init__(config, dataset)
+        super(NeuMF, self).__init__(config, dataset)
 
         # load dataset info
         self.LABEL = config["LABEL_FIELD"]
@@ -71,7 +71,11 @@ class NeuMF_IPS(DebiasedRecommender):
         elif self.mlp_train:
             self.predict_layer = nn.Linear(self.mlp_hidden_size[-1], 1)
         self.sigmoid = nn.Sigmoid()
-        self.loss = nn.BCEWithLogitsLoss(reduction="none")
+        
+        if config["bias"]["use_IPS"]:
+            self.loss = nn.BCEWithLogitsLoss(reduction="none")
+        else:
+            self.loss = nn.BCEWithLogitsLoss()
 
         self.propensity_score, self.column = dataset.estimate_pscore()
 
@@ -143,19 +147,14 @@ class NeuMF_IPS(DebiasedRecommender):
             )
         return output.squeeze(-1)
 
-    def calculate_loss(self, interaction):
+    def _calculate_loss(self, interaction):
         user = interaction[self.USER_ID]
         item = interaction[self.ITEM_ID]
         label = interaction[self.LABEL]
 
         output = self.forward(user, item)
 
-        weight = self.propensity_score.to(self.device)[
-            interaction[self.column].long()
-        ].to(self.device)
-
-        loss = self.loss(output, label)
-        return torch.mean(1 / (weight + 1e-7) * loss)
+        return self.loss(output, label)
 
     def predict(self, interaction):
         user = interaction[self.USER_ID]

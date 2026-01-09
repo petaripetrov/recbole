@@ -559,7 +559,7 @@ class ItemCoverage(AbstractMetric):
 
     def __init__(self, config):
         super().__init__(config)
-        self.topk = config["metric_top_k"]
+        self.topk = config["topk"]
 
     def used_info(self, dataobject):
         """Get the matrix of recommendation items and number of items in total item set"""
@@ -739,7 +739,7 @@ class GiniIndex(AbstractMetric):
 
     def __init__(self, config):
         super().__init__(config)
-        self.topk = config["metric_top_k"]
+        self.topk = config["topk"]
 
     def used_info(self, dataobject):
         """Get the matrix of recommendation items and number of items in total item set"""

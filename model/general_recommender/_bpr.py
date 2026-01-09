@@ -18,19 +18,19 @@ Reference:
 import torch
 import torch.nn as nn
 
-from recbole.model.abstract_recommender import DebiasedRecommender
+from recbole.model.abstract_recommender import GeneralRecommender
 from recbole.model.init import xavier_normal_initialization
 from recbole.model.loss import BPRLoss
 from recbole.utils import InputType
 
 
-class BPR_IPS(DebiasedRecommender):
+class _BPR(GeneralRecommender):
     r"""BPR is a basic matrix factorization model that be trained in the pairwise way."""
 
     input_type = InputType.PAIRWISE
 
     def __init__(self, config, dataset):
-        super(BPR_IPS, self).__init__(config, dataset)
+        super(_BPR, self).__init__(config, dataset)
 
         # load parameters info
         self.embedding_size = config["embedding_size"]
@@ -38,10 +38,7 @@ class BPR_IPS(DebiasedRecommender):
         # define layers and loss
         self.user_embedding = nn.Embedding(self.n_users, self.embedding_size)
         self.item_embedding = nn.Embedding(self.n_items, self.embedding_size)
-        self.loss = BPRLoss(reduction="none")
-
-        self.propensity_score, self.column = dataset.estimate_pscore()
-        self.use_precomp_prop = config["use_precomp_prop"]
+        self.loss = BPRLoss()
 
         # parameters initialization
         self.apply(xavier_normal_initialization)
@@ -80,21 +77,10 @@ class BPR_IPS(DebiasedRecommender):
 
         user_e, pos_e = self.forward(user, pos_item)
         neg_e = self.get_item_embedding(neg_item)
-        pos_item_score, neg_item_score = (
-            torch.mul(user_e, pos_e).sum(dim=1),
-            torch.mul(user_e, neg_e).sum(dim=1),
-        )
-
-        if self.use_precomp_prop:
-            weight = interaction[self.PROPENSITIES]
-        else:
-            weight = self.propensity_score.to(self.device)[
-                interaction[self.column].long()
-            ].to(self.device)
-
-        loss = torch.mean(
-            1 / (weight + 1e-7) * self.loss(pos_item_score, neg_item_score)
-        )
+        pos_item_score, neg_item_score = torch.mul(user_e, pos_e).sum(dim=1), torch.mul(
+            user_e, neg_e
+        ).sum(dim=1)
+        loss = self.loss(pos_item_score, neg_item_score)
         return loss
 
     def predict(self, interaction):

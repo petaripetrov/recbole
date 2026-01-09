@@ -108,20 +108,19 @@ class Dataset(torch.utils.data.Dataset):
         self.logger = getLogger()
         self._from_scratch()
 
-        self.pscore_method = config["pscore_method"]
+        self.pscore_method = config["bias"]["pscore_method"]
         self.ITEM_ID = config["ITEM_ID_FIELD"]
         self.USER_ID = config["USER_ID_FIELD"]
         self.n_items = self.num(self.ITEM_ID)
         self.n_users = self.num(self.USER_ID)
-        self.eta = config["eta"]
+        self.eta = config["bias"]["eta"]
         self.tail_ratio = config["tail_ratio"]
         self.head_ratio = config["head_ratio"]
         self.build_protected_map = False
 
-        if config["use_WTD"]:
+        if config["bias"]["use_WTD"]:
             # TODO perhaps we should calculate the tail and head sets ahead of time in case WTD is messing with this too much
             self.logger.info("Sampling dataset with WTD.")
-            self.splits_map = config["splits_map"]
             self._build_WTD_w()
 
         if "fairness" in config:

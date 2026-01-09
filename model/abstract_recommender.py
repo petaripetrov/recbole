@@ -18,6 +18,7 @@ import numpy as np
 import torch
 import torch.nn as nn
 
+from recbole.data.interaction import Interaction
 from recbole.model.layers import FLEmbedding, FMEmbedding, FMFirstOrderLinear
 from recbole.utils import FeatureSource, FeatureType, InputType, ModelType, set_color
 
@@ -29,7 +30,7 @@ class AbstractRecommender(nn.Module):
         self.logger = getLogger()
         super(AbstractRecommender, self).__init__()
 
-    def calculate_loss(self, interaction):
+    def calculate_loss(self, interaction: Interaction) -> torch.Tensor:
         r"""Calculate the training loss for a batch data.
 
         Args:
@@ -616,6 +617,7 @@ class ContextRecommender(AbstractRecommender):
 
 # -*- coding: utf-8 -*-
 # @Time   : 2022/3/24
+# @Updated: 2026/01/09
 # @Author : Jingsen Zhang
 # @Email  : zhangjingsen@ruc.edu.cn
 
@@ -641,5 +643,32 @@ class DebiasedRecommender(AbstractRecommender):
         self.n_users = dataset.num(self.USER_ID)
         self.n_items = dataset.num(self.ITEM_ID)
 
+        if "bias" in config:
+            self.use_IPS = config["bias"]["use_IPS"]
+            self.propensity_score, self.column = dataset.estimate_pscore()
+            self.use_precomp_prop = config["use_precomp_prop"]
+
         # load parameters info
         self.device = config["device"]
+
+    def _calculate_loss(self, interaction: Interaction) -> torch.Tensor:
+        raise NotImplementedError
+        
+
+    def calculate_loss(self, interaction: Interaction) -> torch.Tensor:
+        loss = self._calculate_loss(interaction)
+
+        if self.use_IPS:
+            if self.use_precomp_prop:
+                weight = interaction[self.PROPENSITIES]
+            else:
+                weight = self.propensity_score.to(self.device)[
+                    interaction[self.column].long()
+                ].to(self.device)
+
+            return torch.mean(
+                1 / (weight + 1e-7) * loss
+            )
+
+        return loss
+

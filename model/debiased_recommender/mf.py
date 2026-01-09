@@ -18,7 +18,7 @@ from recbole.utils import InputType
 from recbole.model.abstract_recommender import DebiasedRecommender
 
 
-class MF_IPS(DebiasedRecommender):
+class MF(DebiasedRecommender):
     r"""
         Inverse Propensity Score based on MF model.
         We simply implemented three methods (in recbole-debias.data.dataset) to calculate Propensity Score:
@@ -29,7 +29,7 @@ class MF_IPS(DebiasedRecommender):
     input_type = InputType.POINTWISE
 
     def __init__(self, config, dataset):
-        super(MF_IPS, self).__init__(config, dataset)
+        super(MF, self).__init__(config, dataset)
 
         self.LABEL = config['LABEL_FIELD']
 
@@ -74,15 +74,13 @@ class MF_IPS(DebiasedRecommender):
         item_e = self.get_item_embedding(item)
         return torch.mul(user_e, item_e).sum(dim=1)  # MSELoss 需要加sigmoid吗
 
-    def calculate_loss(self, interaction):
+    def _calculate_loss(self, interaction):
         user = interaction[self.USER_ID]
         item = interaction[self.ITEM_ID]
         label = interaction[self.LABEL]
         output = self.forward(user, item)
 
-        weight = self.propensity_score.to(self.device)[interaction[self.column].long()].to(self.device)
-        loss = torch.mean(1 / (weight + 1e-7) * self.loss(output, label))
-        return loss
+        return self.loss(output, label)
 
     def predict(self, interaction):
         user = interaction[self.USER_ID]

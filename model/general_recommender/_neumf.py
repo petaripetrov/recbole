@@ -24,7 +24,7 @@ from recbole.model.layers import MLPLayers
 from recbole.utils import InputType
 
 
-class NeuMF(GeneralRecommender):
+class _NeuMF(GeneralRecommender):
     r"""NeuMF is an neural network enhanced matrix factorization model.
     It replace the dot product to mlp for a more precise user-item interaction.
 
@@ -37,7 +37,7 @@ class NeuMF(GeneralRecommender):
     input_type = InputType.POINTWISE
 
     def __init__(self, config, dataset):
-        super(NeuMF, self).__init__(config, dataset)
+        super(_NeuMF, self).__init__(config, dataset)
 
         # load dataset info
         self.LABEL = config["LABEL_FIELD"]
