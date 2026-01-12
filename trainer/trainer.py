@@ -659,8 +659,10 @@ class Trainer(AbstractTrainer):
         attention = attention * valid_mask.float()
 
         item_attention = attention.sum(dim=0)
-
-        group_attention = torch.zeros(num_groups, device=scores.device)
+        # TODO check the types here and make sure it makes sense
+        group_attention = torch.zeros(
+            num_groups, device=scores.device, dtype=item_attention.dtype
+        )
         protected_map = protected_map.to(scores.device)
 
         group_attention.scatter_add_(0, protected_map, item_attention)

@@ -10,7 +10,6 @@ Random
 
 """
 
-import torch
 import random
 
 from recbole.model.abstract_recommender import GeneralRecommender

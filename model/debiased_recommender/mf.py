@@ -13,19 +13,20 @@ Reference:
 import torch
 import torch.nn as nn
 
+from recbole.model.abstract_recommender import DebiasedRecommender
 from recbole.model.init import xavier_normal_initialization
 from recbole.utils import InputType
-from recbole.model.abstract_recommender import DebiasedRecommender
 
 
 class MF(DebiasedRecommender):
     r"""
-        Inverse Propensity Score based on MF model.
-        We simply implemented three methods (in recbole-debias.data.dataset) to calculate Propensity Score:
-            1. User Propensity
-            2. Item Propensity
-            3. Naive Bayes (uniform) Propensity
+    Inverse Propensity Score based on MF model.
+    We simply implemented three methods (in recbole-debias.data.dataset) to calculate Propensity Score:
+        1. User Propensity
+        2. Item Propensity
+        3. Naive Bayes (uniform) Propensity
     """
+
     input_type = InputType.POINTWISE
 
     def __init__(self, config, dataset):
