@@ -32,24 +32,27 @@ class MF(DebiasedRecommender):
     def __init__(self, config, dataset):
         super(MF, self).__init__(config, dataset)
 
-        self.LABEL = config['LABEL_FIELD']
+        self.LABEL = config["LABEL_FIELD"]
 
         # load parameters info
-        self.embedding_size = config['embedding_size']
+        self.embedding_size = config["embedding_size"]
 
         # define layers and loss
         self.user_embedding = nn.Embedding(self.n_users, self.embedding_size)
         self.item_embedding = nn.Embedding(self.n_items, self.embedding_size)
-        self.loss = nn.MSELoss(reduction='none')
-        self.sigmoid = nn.Sigmoid()
 
-        self.propensity_score, self.column = dataset.estimate_pscore()
+        if config["bias"]["use_IPS"]:
+            self.loss = nn.MSELoss(reduction="none")
+        else:
+            self.loss = nn.MSELoss()
+
+        self.sigmoid = nn.Sigmoid()
 
         # parameters initializationBCE
         self.apply(xavier_normal_initialization)
 
     def get_user_embedding(self, user):
-        r""" Get a batch of user embedding tensor according to input user's id.
+        r"""Get a batch of user embedding tensor according to input user's id.
 
         Args:
             user (torch.LongTensor): The input tensor that contains user's id, shape: [batch_size, ]
@@ -60,7 +63,7 @@ class MF(DebiasedRecommender):
         return self.user_embedding(user)
 
     def get_item_embedding(self, item):
-        r""" Get a batch of item embedding tensor according to input item's id.
+        r"""Get a batch of item embedding tensor according to input item's id.
 
         Args:
             item (torch.LongTensor): The input tensor that contains item's id, shape: [batch_size, ]

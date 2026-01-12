@@ -12,10 +12,14 @@ Random
 
 import random
 
+import torch
+
 from recbole.model.abstract_recommender import GeneralRecommender
 from recbole.utils import InputType, ModelType
 
 
+# Perhaps add a sanity check to make sure that if a model is being used by the
+# experiment, it is a debiased model and supports IPS
 class Random(GeneralRecommender):
     """Random is an fundamental model that recommends random items."""
 

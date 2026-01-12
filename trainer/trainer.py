@@ -656,7 +656,7 @@ class Trainer(AbstractTrainer):
         scores_masked[~valid_mask] = -eps
 
         attention = F.softmax(scores_masked, dim=1)
-        attention = attention * valid_mask.float()
+        attention = attention * valid_mask
 
         item_attention = attention.sum(dim=0)
         # TODO check the types here and make sure it makes sense
