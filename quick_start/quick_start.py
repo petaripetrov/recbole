@@ -217,6 +217,8 @@ def objective_function(config_dict=None, config_file_list=None, saved=True):
     init_logger(config)
     logging.basicConfig(level=logging.ERROR)
     dataset = create_dataset(config)
+    dataset.build_rel_sets()
+    
     train_data, valid_data, test_data = data_preparation(config, dataset)
     init_seed(config["seed"], config["reproducibility"])
     model_name = config["model"]

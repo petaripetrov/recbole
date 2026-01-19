@@ -130,7 +130,7 @@ def fa_ir(k: int, q: list[int], g: dict[int, bool], p: float, a: float) -> list[
     return res
 
 
-def apply_fa_ir(scores, k, q_g):
+def apply_fa_ir(scores, k, q_g, p=0.3, a=0.1):
     n_users, K = scores.shape
     reranked_items = np.zeros((n_users, k))
 
@@ -141,7 +141,7 @@ def apply_fa_ir(scores, k, q_g):
             enumerate(scores[u].tolist()), key=lambda x: x[1], reverse=True
         )
         # Perhaps 
-        new_rank = fa_ir(k, orig_rank, q_g, 0.3, 0.1)  # insert fa_ir here
+        new_rank = fa_ir(k, orig_rank, q_g, p, a)  # insert fa_ir here
         reranked_items[u] = np.array(new_rank)
     reranked_items = torch.tensor(reranked_items, dtype=torch.int64)
 

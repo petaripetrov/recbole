@@ -59,7 +59,7 @@ def set_color(log, color, highlight=True):
     return prev_log + log + "\033[0m"
 
 
-def init_logger(config, log_dir):
+def init_logger(config, log_dir="./log/"):
     """
     A logger that can show a message on standard output and write it into the
     file named `filename` simultaneously.

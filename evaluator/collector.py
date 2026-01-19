@@ -81,6 +81,10 @@ class Collector(object):
         self.topk = self.config["topk"]
         self.device = self.config["device"]
         self.logger = getLogger()
+        
+        if config["fairness"]["with_fa_ir"]: 
+            self.p = config["fairness"]["p"]
+            self.a = config["fairness"]["a"]
 
     def data_collect(self, train_data):
         """Collect the evaluation resource from training data.
@@ -177,7 +181,7 @@ class Collector(object):
             # get topk
             if self.config["fairness"]["with_fa_ir"]:
                 prot_map = self.data_struct.get("data.prot_map")
-                topk_idx = apply_fa_ir(scores_tensor, max(self.topk), prot_map)
+                topk_idx = apply_fa_ir(scores_tensor, max(self.topk), prot_map, self.p, self.a)
             else:
                 _, topk_idx = torch.topk(
                     scores_tensor, max(self.topk), dim=-1
@@ -188,7 +192,7 @@ class Collector(object):
         if self.register.need("rec.topk"):
             if self.config["fairness"]["with_fa_ir"]:
                 prot_map = self.data_struct.get("data.prot_map")
-                topk_idx = apply_fa_ir(scores_tensor, max(self.topk), prot_map)
+                topk_idx = apply_fa_ir(scores_tensor, max(self.topk), prot_map, self.p, self.a)
             else:
                 _, topk_idx = torch.topk(
                     scores_tensor, max(self.topk), dim=-1
