@@ -167,7 +167,7 @@ def data_preparation(config, dataset):
 
         train_dataset, valid_dataset, test_dataset = built_datasets
 
-        if config["bias"]["use_WTD"]:
+        if config["use_WTD"]:
             train_dataset.apply_WTD()
 
         train_sampler, valid_sampler, test_sampler = create_samplers(

@@ -438,7 +438,7 @@ class Trainer(AbstractTrainer):
 
         self.eval_collector.data_collect(train_data)
 
-        if self.config["fairness"]["equalize_attention"]:
+        if self.config["equalize_attention"]:
             self.protected_map = train_data.dataset.protected_map
 
         if self.config["train_neg_sample_args"].get("dynamic", False):
@@ -633,7 +633,7 @@ class Trainer(AbstractTrainer):
                     set_color("GPU RAM: " + get_gpu_usage(self.device), "yellow")
                 )
 
-            if self.config["fairness"]["equalize_attention"]:
+            if self.config["equalize_attention"]:
                 scores = self.equalize_attention(scores, self.protected_map, 2)
 
             self.eval_collector.eval_batch_collect(

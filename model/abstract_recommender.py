@@ -643,10 +643,9 @@ class DebiasedRecommender(AbstractRecommender):
         self.n_users = dataset.num(self.USER_ID)
         self.n_items = dataset.num(self.ITEM_ID)
 
-        if "bias" in config:
-            self.use_IPS = config["bias"]["use_IPS"]
-            self.propensity_score, self.column = dataset.estimate_pscore()
-            self.use_precomp_prop = config["use_precomp_prop"]
+        self.use_IPS = config["use_IPS"]
+        self.propensity_score, self.column = dataset.estimate_pscore()
+        self.use_precomp_prop = config["use_precomp_prop"]
 
         # load parameters info
         self.device = config["device"]

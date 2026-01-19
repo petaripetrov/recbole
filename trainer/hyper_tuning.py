@@ -114,7 +114,7 @@ def exhaustive_search(new_ids, domain, trials, seed, nbMaxSucessiveFailures=1000
         ]
     )
 
-    rng = np.random.RandomState(seed)
+    rng = np.random.default_rng()
     rval = []
     for _, new_id in enumerate(new_ids):
         newSample = False
@@ -174,6 +174,7 @@ class HyperTuning(object):
         params_file=None,
         params_dict=None,
         fixed_config_file_list=None,
+        config_dict=None,
         display_file=None,
         algo="exhaustive",
         max_evals=100,
@@ -189,6 +190,7 @@ class HyperTuning(object):
         self.objective_function = objective_function
         self.max_evals = max_evals
         self.fixed_config_file_list = fixed_config_file_list
+        self.config_dict = config_dict
         self.display_file = display_file
         if space:
             self.space = space
@@ -345,6 +347,7 @@ class HyperTuning(object):
         params_str = self.params2str(params)
         self.params_list.append(params_str)
         print("running parameters:", config_dict)
+        config_dict = config_dict | self.config_dict
         result_dict = self.objective_function(config_dict, self.fixed_config_file_list)
         self.params2result[params_str] = result_dict
         model, score, bigger = (

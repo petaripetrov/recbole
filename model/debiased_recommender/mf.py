@@ -41,7 +41,7 @@ class MF(DebiasedRecommender):
         self.user_embedding = nn.Embedding(self.n_users, self.embedding_size)
         self.item_embedding = nn.Embedding(self.n_items, self.embedding_size)
 
-        if config["bias"]["use_IPS"]:
+        if config["use_IPS"]:
             self.loss = nn.MSELoss(reduction="none")
         else:
             self.loss = nn.MSELoss()

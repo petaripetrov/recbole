@@ -72,7 +72,7 @@ class NeuMF(DebiasedRecommender):
             self.predict_layer = nn.Linear(self.mlp_hidden_size[-1], 1)
         self.sigmoid = nn.Sigmoid()
         
-        if config["bias"]["use_IPS"]:
+        if config["use_IPS"]:
             self.loss = nn.BCEWithLogitsLoss(reduction="none")
         else:
             self.loss = nn.BCEWithLogitsLoss()

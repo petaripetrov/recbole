@@ -66,7 +66,7 @@ class LightGCN(DebiasedRecommender):
             num_embeddings=self.n_items, embedding_dim=self.latent_dim
         )
 
-        if config["bias"]["use_IPS"]:
+        if config["use_IPS"]:
             self.mf_loss = BPRLoss(reduction="none")
             # this returns only one thing when we need a matrix for the IPS
             self.reg_loss = EmbLoss()
