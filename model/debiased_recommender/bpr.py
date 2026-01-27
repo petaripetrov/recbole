@@ -29,8 +29,14 @@ class BPR(DebiasedRecommender):
 
     input_type = InputType.PAIRWISE
 
-    def __init__(self, config, dataset):
-        super(BPR, self).__init__(config, dataset)
+    def __init__(self, config, dataset, state_dict=None):
+        super(BPR, self).__init__(config, dataset, state_dict)
+        
+        if state_dict:
+            self.user_embedding = nn.Embedding.from_pretrained(state_dict["user_embedding.weight"])
+            self.item_embedding = nn.Embedding.from_pretrained(state_dict["item_embedding.weight"])
+
+            return
 
         # load parameters info
         self.embedding_size = config["embedding_size"]

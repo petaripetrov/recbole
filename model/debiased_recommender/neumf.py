@@ -36,8 +36,16 @@ class NeuMF(DebiasedRecommender):
 
     input_type = InputType.POINTWISE
 
-    def __init__(self, config, dataset):
-        super(NeuMF, self).__init__(config, dataset)
+    def __init__(self, config, dataset, state_dict=None):
+        super(NeuMF, self).__init__(config, dataset, state_dict)
+
+        if state_dict:
+            self.user_mf_embedding = nn.Embedding.from_pretrained(state_dict["user_mf_embedding.weight"])
+            self.item_mf_embedding = nn.Embedding.from_pretrained(state_dict["item_mf_embedding.weight"])
+            self.user_mlp_embedding = nn.Embedding.from_pretrained(state_dict["user_mlp_embedding.weight"])
+            self.item_mlp_embedding = nn.Embedding.from_pretrained(state_dict["item_mlp_embedding.weight"])
+
+            return
 
         # load dataset info
         self.LABEL = config["LABEL_FIELD"]
@@ -129,12 +137,15 @@ class NeuMF(DebiasedRecommender):
         item_mf_e = self.item_mf_embedding(item)
         user_mlp_e = self.user_mlp_embedding(user)
         item_mlp_e = self.item_mlp_embedding(item)
+
         if self.mf_train:
             mf_output = torch.mul(user_mf_e, item_mf_e)  # [batch_size, embedding_size]
         if self.mlp_train:
             mlp_output = self.mlp_layers(
                 torch.cat((user_mlp_e, item_mlp_e), -1)
             )  # [batch_size, layers[-1]]
+
+        
         if self.mf_train and self.mlp_train:
             output = self.predict_layer(torch.cat((mf_output, mlp_output), -1))
         elif self.mf_train:

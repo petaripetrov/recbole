@@ -42,8 +42,14 @@ class LightGCN(DebiasedRecommender):
 
     input_type = InputType.PAIRWISE
 
-    def __init__(self, config, dataset):
-        super(LightGCN, self).__init__(config, dataset)
+    def __init__(self, config, dataset, state_dict=None):
+        super(LightGCN, self).__init__(config, dataset, state_dict)
+
+        if state_dict:
+            self.user_embedding = torch.nn.Embedding.from_pretrained(state_dict["user_embedding.weight"])
+            self.item_embedding = torch.nn.Embedding.from_pretrained(state_dict["item_embedding.weight"])
+
+            return
 
         # load dataset info
         self.interaction_matrix = dataset.inter_matrix(form="coo").astype(np.float32)

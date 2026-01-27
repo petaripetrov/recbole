@@ -29,8 +29,14 @@ class MF(DebiasedRecommender):
 
     input_type = InputType.POINTWISE
 
-    def __init__(self, config, dataset):
-        super(MF, self).__init__(config, dataset)
+    def __init__(self, config, dataset, state_dict=None):
+        super(MF, self).__init__(config, dataset, state_dict)
+
+        if state_dict:
+            self.user_embedding = nn.Embedding.from_pretrained(state_dict["user_embedding.weight"])
+            self.item_embedding = nn.Embedding.from_pretrained(state_dict["item_embedding.weight"])
+
+            return
 
         self.LABEL = config["LABEL_FIELD"]
 
