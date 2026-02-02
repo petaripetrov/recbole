@@ -2426,7 +2426,10 @@ class Dataset(torch.utils.data.Dataset):
 
         idx = np.random.choice(len(w), size=len(w), replace=True, p=w)
 
-        new_inter = self.inter_feat.iloc[idx]
+        if isinstance(self.inter_feat, Interaction):
+            new_inter = self.inter_feat[idx]
+        else:
+            new_inter = self.inter_feat.iloc[idx]
         self.inter_feat = new_inter
 
     def _build_WTD_w(self):
