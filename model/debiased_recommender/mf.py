@@ -35,17 +35,15 @@ class MF(DebiasedRecommender):
         if state_dict:
             self.user_embedding = nn.Embedding.from_pretrained(state_dict["user_embedding.weight"])
             self.item_embedding = nn.Embedding.from_pretrained(state_dict["item_embedding.weight"])
-
-            return
+        else:
+            self.user_embedding = nn.Embedding(self.n_users, self.embedding_size)
+            self.item_embedding = nn.Embedding(self.n_items, self.embedding_size)
 
         self.LABEL = config["LABEL_FIELD"]
 
         # load parameters info
         self.embedding_size = config["embedding_size"]
 
-        # define layers and loss
-        self.user_embedding = nn.Embedding(self.n_users, self.embedding_size)
-        self.item_embedding = nn.Embedding(self.n_items, self.embedding_size)
 
         if config["use_IPS"]:
             self.loss = nn.MSELoss(reduction="none")

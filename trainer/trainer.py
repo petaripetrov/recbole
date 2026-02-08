@@ -60,7 +60,7 @@ class AbstractTrainer(object):
         self.model = model
         if not config["single_spec"]:
             self.model = torch.nn.SyncBatchNorm.convert_sync_batchnorm(model)
-            self.distributed_model = DistributedDataParallel(
+            self.model = DistributedDataParallel( 
                 self.model, device_ids=[config["local_rank"]]
             )
 
@@ -72,16 +72,11 @@ class AbstractTrainer(object):
         r"""Evaluate the model based on the eval data."""
 
         raise NotImplementedError("Method [next] should be implemented.")
-
-    def set_reduce_hook(self):
-        r"""Call the forward function of 'distributed_model' to apply grads
-        reduce hook to each parameter of its module.
-
-        """
-        t = self.model.forward
-        self.model.forward = lambda x: x
-        self.distributed_model(torch.LongTensor([0]).to(self.device))
-        self.model.forward = t
+    
+    def get_model(self):
+        """Unwrap if DDP"""
+        # TODO check via local_rank / flag from config
+        return self.model.module if hasattr(self.model, "module") else self.model
 
     def sync_grad_loss(self):
         r"""Ensure that each parameter appears to the loss function to
@@ -89,8 +84,9 @@ class AbstractTrainer(object):
 
         """
         sync_loss = 0
-        for params in self.model.parameters():
-            sync_loss += torch.sum(params) * 0
+        # model = self.get_model()
+        # for params in model.parameters():
+        #     sync_loss += torch.sum(params) * 0
         return sync_loss
 
 
@@ -218,7 +214,7 @@ class Trainer(AbstractTrainer):
             tuple which includes the sum of loss in each part.
         """
         self.model.train()
-        loss_func = loss_func or self.model.calculate_loss
+        loss_func = loss_func or self.get_model().calculate_loss
         total_loss = None
         iter_data = (
             tqdm(
@@ -238,10 +234,10 @@ class Trainer(AbstractTrainer):
         for batch_idx, interaction in enumerate(iter_data):
             interaction = interaction.to(self.device)
             self.optimizer.zero_grad()
-            sync_loss = 0
-            if not self.config["single_spec"]:
-                self.set_reduce_hook()
-                sync_loss = self.sync_grad_loss()
+            # sync_loss = 0
+            # if not self.config["single_spec"]:
+            #     self.set_reduce_hook()
+            #     sync_loss = self.sync_grad_loss()
 
             with torch.autocast(device_type=self.device.type, enabled=self.enable_amp):
                 losses = loss_func(interaction)
@@ -260,7 +256,7 @@ class Trainer(AbstractTrainer):
                     losses.item() if total_loss is None else total_loss + losses.item()
                 )
             self._check_nan(loss)
-            scaler.scale(loss + sync_loss).backward()
+            scaler.scale(loss).backward()
             if self.clip_grad_norm:
                 clip_grad_norm_(self.model.parameters(), **self.clip_grad_norm)
             scaler.step(self.optimizer)
@@ -305,7 +301,7 @@ class Trainer(AbstractTrainer):
             "cur_step": self.cur_step,
             "best_valid_score": self.best_valid_score,
             "state_dict": self.model.state_dict(),
-            "other_parameter": self.model.other_parameter(),
+            "other_parameter": self.get_model().other_parameter(),
             "optimizer": self.optimizer.state_dict(),
         }
         torch.save(state, saved_model_file, pickle_protocol=4)
@@ -340,7 +336,7 @@ class Trainer(AbstractTrainer):
                 "This may yield an exception while state_dict is being loaded."
             )
         self.model.load_state_dict(checkpoint["state_dict"])
-        self.model.load_other_parameter(checkpoint.get("other_parameter"))
+        self.get_model().load_other_parameter(checkpoint.get("other_parameter"))
 
         # load optimizer state from checkpoint only when optimizer type is not changed
         self.optimizer.load_state_dict(checkpoint["optimizer"])
@@ -442,7 +438,7 @@ class Trainer(AbstractTrainer):
             self.protected_map = train_data.dataset.protected_map
 
         if self.config["train_neg_sample_args"].get("dynamic", False):
-            train_data.get_model(self.model)
+            train_data.get_model(self.get_model())
         valid_step = 0
 
         for epoch_idx in range(self.start_epoch, self.epochs):
@@ -534,14 +530,14 @@ class Trainer(AbstractTrainer):
         interaction, history_index, positive_u, positive_i = batched_data
         try:
             # Note: interaction without item ids
-            scores = self.model.full_sort_predict(interaction.to(self.device))
+            scores = self.get_model().full_sort_predict(interaction.to(self.device))
         except NotImplementedError:
             inter_len = len(interaction)
             new_inter = interaction.to(self.device).repeat_interleave(self.tot_item_num)
             batch_size = len(new_inter)
             new_inter.update(self.item_tensor.repeat(inter_len))
             if batch_size <= self.test_batch_size:
-                scores = self.model.predict(new_inter)
+                scores = self.get_model().predict(new_inter)
             else:
                 scores = self._spilt_predict(new_inter, batch_size)
 
@@ -555,7 +551,7 @@ class Trainer(AbstractTrainer):
         interaction, row_idx, positive_u, positive_i = batched_data
         batch_size = interaction.length
         if batch_size <= self.test_batch_size:
-            origin_scores = self.model.predict(interaction.to(self.device))
+            origin_scores = self.get_model().predict(interaction.to(self.device))
         else:
             origin_scores = self._spilt_predict(interaction, batch_size)
 
@@ -595,7 +591,7 @@ class Trainer(AbstractTrainer):
             checkpoint = torch.load(
                 checkpoint_file, map_location=self.device, weights_only=False
             )
-            self.model.load_other_parameter(checkpoint.get("other_parameter"))
+            self.get_model().load_other_parameter(checkpoint.get("other_parameter"))
             message_output = "Loading model structure and parameters from {}".format(
                 checkpoint_file
             )
@@ -640,7 +636,7 @@ class Trainer(AbstractTrainer):
                 scores, interaction, positive_u, positive_i
             )
 
-        self.eval_collector.model_collect(self.model)
+        self.eval_collector.model_collect(self.get_model())
         struct = self.eval_collector.get_data_struct()
         result = self.evaluator.evaluate(struct)
         if not self.config["single_spec"]:
@@ -713,7 +709,7 @@ class Trainer(AbstractTrainer):
             current_interaction = dict()
             for key, spilt_tensor in spilt_interaction.items():
                 current_interaction[key] = spilt_tensor[i]
-            result = self.model.predict(
+            result = self.get_model().predict(
                 Interaction(current_interaction).to(self.device)
             )
             if len(result.shape) == 0:

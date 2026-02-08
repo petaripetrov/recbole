@@ -48,8 +48,13 @@ class LightGCN(DebiasedRecommender):
         if state_dict:
             self.user_embedding = torch.nn.Embedding.from_pretrained(state_dict["user_embedding.weight"])
             self.item_embedding = torch.nn.Embedding.from_pretrained(state_dict["item_embedding.weight"])
-
-            return
+        else:
+            self.user_embedding = torch.nn.Embedding(
+                num_embeddings=self.n_users, embedding_dim=self.latent_dim
+            )
+            self.item_embedding = torch.nn.Embedding(
+                num_embeddings=self.n_items, embedding_dim=self.latent_dim
+            )
 
         # load dataset info
         self.interaction_matrix = dataset.inter_matrix(form="coo").astype(np.float32)
@@ -65,12 +70,6 @@ class LightGCN(DebiasedRecommender):
         ]  # float32 type: the weight decay for l2 normalization
         self.require_pow = config["require_pow"]
 
-        self.user_embedding = torch.nn.Embedding(
-            num_embeddings=self.n_users, embedding_dim=self.latent_dim
-        )
-        self.item_embedding = torch.nn.Embedding(
-            num_embeddings=self.n_items, embedding_dim=self.latent_dim
-        )
 
         if config["use_IPS"]:
             self.mf_loss = BPRLoss(reduction="none")

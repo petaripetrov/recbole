@@ -635,9 +635,6 @@ class DebiasedRecommender(AbstractRecommender):
     def __init__(self, config, dataset, state_dict=None):
         super(DebiasedRecommender, self).__init__()
         
-        if state_dict:
-            return
-
         # load dataset info
         self.USER_ID = config["USER_ID_FIELD"]
         self.ITEM_ID = config["ITEM_ID_FIELD"]
