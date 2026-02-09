@@ -36,13 +36,12 @@ class BPR(DebiasedRecommender):
             self.user_embedding = nn.Embedding.from_pretrained(state_dict["user_embedding.weight"])
             self.item_embedding = nn.Embedding.from_pretrained(state_dict["item_embedding.weight"])
         else:
+            # load parameters info
+            self.embedding_size = config["embedding_size"]
+            
             self.user_embedding = nn.Embedding(self.n_users, self.embedding_size)
             self.item_embedding = nn.Embedding(self.n_items, self.embedding_size)
         
-
-        # load parameters info
-        self.embedding_size = config["embedding_size"]
-
         # define layers and loss
         if config["use_IPS"]:
             self.loss = BPRLoss(reduction="none")

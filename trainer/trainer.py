@@ -750,7 +750,7 @@ class KGTrainer(Trainer):
             return super()._train_epoch(
                 train_data,
                 epoch_idx,
-                loss_func=self.model.calculate_kg_loss,
+                loss_func=self.get_model().calculate_kg_loss,
                 show_progress=show_progress,
             )
         return None
@@ -776,14 +776,14 @@ class KGATTrainer(Trainer):
         kg_total_loss = super()._train_epoch(
             train_data,
             epoch_idx,
-            loss_func=self.model.calculate_kg_loss,
+            loss_func=self.get_model().calculate_kg_loss,
             show_progress=show_progress,
         )
 
         # update A
         self.model.eval()
         with torch.no_grad():
-            self.model.update_attentive_A()
+            self.get_model().update_attentive_A()
 
         return rs_total_loss, kg_total_loss
 
@@ -811,7 +811,7 @@ class PretrainTrainer(Trainer):
             "epoch": epoch,
             "state_dict": self.model.state_dict(),
             "optimizer": self.optimizer.state_dict(),
-            "other_parameter": self.model.other_parameter(),
+            "other_parameter": self.get_model().other_parameter(),
         }
         torch.save(state, saved_model_file)
         self.saved_model_file = saved_model_file
@@ -869,9 +869,9 @@ class S3RecTrainer(PretrainTrainer):
         show_progress=False,
         callback_fn=None,
     ):
-        if self.model.train_stage == "pretrain":
+        if self.get_model().train_stage == "pretrain":
             return self.pretrain(train_data, verbose, show_progress)
-        elif self.model.train_stage == "finetune":
+        elif self.get_model().train_stage == "finetune":
             return super().fit(
                 train_data, valid_data, verbose, saved, show_progress, callback_fn
             )
@@ -897,7 +897,7 @@ class MKRTrainer(Trainer):
         rs_total_loss = super()._train_epoch(
             train_data,
             epoch_idx,
-            loss_func=self.model.calculate_rs_loss,
+            loss_func=self.get_model().calculate_rs_loss,
             show_progress=show_progress,
         )
 
@@ -908,7 +908,7 @@ class MKRTrainer(Trainer):
             kg_total_loss = super()._train_epoch(
                 train_data,
                 epoch_idx,
-                loss_func=self.model.calculate_kg_loss,
+                loss_func=self.get_model().calculate_kg_loss,
                 show_progress=show_progress,
             )
 
@@ -1087,7 +1087,7 @@ class DecisionTreeTrainer(AbstractTrainer):
 
                 if update_flag:
                     if saved:
-                        self.model.save_model(self.temp_best_file)
+                        self.get_model().save_model(self.temp_best_file)
                         self._save_checkpoint(epoch_idx)
                     self.best_valid_result = valid_result
 
@@ -1169,7 +1169,7 @@ class XGBoostTrainer(DecisionTreeTrainer):
             callbacks=self.callbacks,
         )
 
-        self.model.save_model(self.temp_file)
+        self.get_model().save_model(self.temp_file)
         self.boost_model = self.temp_file
 
     def evaluate(
@@ -1180,11 +1180,11 @@ class XGBoostTrainer(DecisionTreeTrainer):
                 checkpoint_file = model_file
             else:
                 checkpoint_file = self.temp_best_file
-            self.model.load_model(checkpoint_file)
+            self.get_model().load_model(checkpoint_file)
 
         self.deval = self._interaction_to_lib_datatype(eval_data)
         self.eval_true = torch.Tensor(self.deval.get_label())
-        self.eval_pred = torch.Tensor(self.model.predict(self.deval))
+        self.eval_pred = torch.Tensor(self.get_model().predict(self.deval))
 
         self.eval_collector.eval_collect(self.eval_pred, self.eval_true)
         result = self.evaluator.evaluate(self.eval_collector.get_data_struct())
@@ -1231,7 +1231,7 @@ class LightGBMTrainer(DecisionTreeTrainer):
             self.params, self.dtrain, self.num_boost_round, self.evals
         )
 
-        self.model.save_model(self.temp_file)
+        self.get_model().save_model(self.temp_file)
         self.boost_model = self.temp_file
 
     def evaluate(
@@ -1246,7 +1246,7 @@ class LightGBMTrainer(DecisionTreeTrainer):
 
         self.deval_data, self.deval_label = self._interaction_to_sparse(eval_data)
         self.eval_true = torch.Tensor(self.deval_label)
-        self.eval_pred = torch.Tensor(self.model.predict(self.deval_data))
+        self.eval_pred = torch.Tensor(self.get_model().predict(self.deval_data))
 
         self.eval_collector.eval_collect(self.eval_pred, self.eval_true)
         result = self.evaluator.evaluate(self.eval_collector.get_data_struct())
@@ -1271,11 +1271,11 @@ class RaCTTrainer(PretrainTrainer):
         show_progress=False,
         callback_fn=None,
     ):
-        if self.model.train_stage == "actor_pretrain":
+        if self.get_model().train_stage == "actor_pretrain":
             return self.pretrain(train_data, verbose, show_progress)
-        elif self.model.train_stage == "critic_pretrain":
+        elif self.get_model().train_stage == "critic_pretrain":
             return self.pretrain(train_data, verbose, show_progress)
-        elif self.model.train_stage == "finetune":
+        elif self.get_model().train_stage == "finetune":
             return super().fit(
                 train_data, valid_data, verbose, saved, show_progress, callback_fn
             )
@@ -1295,15 +1295,15 @@ class RecVAETrainer(Trainer):
         self.n_dec_epochs = config["n_dec_epochs"]
 
         self.optimizer_encoder = self._build_optimizer(
-            params=self.model.encoder.parameters()
+            params=self.get_model().encoder.parameters()
         )
         self.optimizer_decoder = self._build_optimizer(
-            params=self.model.decoder.parameters()
+            params=self.get_model().decoder.parameters()
         )
 
     def _train_epoch(self, train_data, epoch_idx, loss_func=None, show_progress=False):
         self.optimizer = self.optimizer_encoder
-        encoder_loss_func = lambda data: self.model.calculate_loss(
+        encoder_loss_func = lambda data: self.get_model().calculate_loss(
             data, encoder_flag=True
         )
         for epoch in range(self.n_enc_epochs):
@@ -1314,10 +1314,10 @@ class RecVAETrainer(Trainer):
                 show_progress=show_progress,
             )
 
-        self.model.update_prior()
+        self.get_model().update_prior()
         loss = 0.0
         self.optimizer = self.optimizer_decoder
-        decoder_loss_func = lambda data: self.model.calculate_loss(
+        decoder_loss_func = lambda data: self.get_model().calculate_loss(
             data, encoder_flag=False
         )
         for epoch in range(self.n_dec_epochs):
