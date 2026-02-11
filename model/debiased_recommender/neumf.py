@@ -38,6 +38,19 @@ class NeuMF(DebiasedRecommender):
 
     def __init__(self, config, dataset, state_dict=None):
         super(NeuMF, self).__init__(config, dataset, state_dict)
+            # load dataset info
+        self.LABEL = config["LABEL_FIELD"]
+        
+        # load parameters info
+        self.mf_embedding_size = config.get("mf_embedding_size", 64)
+        self.mlp_embedding_size = config.get("mlp_embedding_size", 64)
+        self.mlp_hidden_size = config.get("mlp_hidden_size", [128, 64])
+        self.dropout_prob = config.get("dropout_prob", 0.1)
+        self.mf_train = config.get("mf_train", True)
+        self.mlp_train = config.get("mlp_train", True)
+        self.use_pretrain = config.get("use_pretrain", False)
+        self.mf_pretrain_path = config["mf_pretrain_path"]
+        self.mlp_pretrain_path = config["mlp_pretrain_path"]
 
         if state_dict:
             self.user_mf_embedding = nn.Embedding.from_pretrained(state_dict["user_mf_embedding.weight"])
@@ -45,20 +58,6 @@ class NeuMF(DebiasedRecommender):
             self.user_mlp_embedding = nn.Embedding.from_pretrained(state_dict["user_mlp_embedding.weight"])
             self.item_mlp_embedding = nn.Embedding.from_pretrained(state_dict["item_mlp_embedding.weight"])
         else:
-            # load dataset info
-            self.LABEL = config["LABEL_FIELD"]
-
-            # load parameters info
-            self.mf_embedding_size = config.get("mf_embedding_size", 64)
-            self.mlp_embedding_size = config.get("mlp_embedding_size", 64)
-            self.mlp_hidden_size = config.get("mlp_hidden_size", [128, 64])
-            self.dropout_prob = config.get("dropout_prob", 0.1)
-            self.mf_train = config.get("mf_train", True)
-            self.mlp_train = config.get("mlp_train", True)
-            self.use_pretrain = config.get("use_pretrain", False)
-            self.mf_pretrain_path = config["mf_pretrain_path"]
-            self.mlp_pretrain_path = config["mlp_pretrain_path"]
-
             # define layers and loss
             self.user_mf_embedding = nn.Embedding(self.n_users, self.mf_embedding_size)
             self.item_mf_embedding = nn.Embedding(self.n_items, self.mf_embedding_size)

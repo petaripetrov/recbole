@@ -20,6 +20,8 @@ import torch
 from recbole.evaluator.register import Register
 from recbole.evaluator.utils import apply_fa_ir
 from recbole.utils import set_color
+import fairsearchcore as fsc
+from fairsearchcore.models import FairScoreDoc
 
 
 class DataStruct(object):
@@ -85,6 +87,8 @@ class Collector(object):
         if config["with_fa_ir"]: 
             self.p = config["p"]
             self.a = config["a"]
+
+            self.fair = fsc.Fair(self.topk[0], config["p"], config["a"])
 
     def data_collect(self, train_data):
         """Collect the evaluation resource from training data.
@@ -180,14 +184,25 @@ class Collector(object):
         if self.register.need("rec.items"):
             # get topk
             if self.config["with_fa_ir"]:
+                _, order_idx = torch.topk(
+                    scores_tensor, len(scores_tensor[0]), dim=-1
+                )  # n_users x k
                 prot_map = self.data_struct.get("data.prot_map")
-                topk_idx = apply_fa_ir(scores_tensor, max(self.topk), prot_map, self.p, self.a)
+
+                topk_idx = []
+                for ranking in order_idx:
+                    r_len = len(ranking)
+
+                    mapped = [FairScoreDoc(ranking[i].item(), r_len - i, bool(prot_map[i])) for i in range(r_len)]
+                    reranked = self.fair.re_rank(mapped)
+
+                    topk_idx.append([r.id for r in reranked][:max(self.topk)])
             else:
                 _, topk_idx = torch.topk(
                     scores_tensor, max(self.topk), dim=-1
                 )  # n_users x k
             # TODO apply FA*IR here, we need access to the prot object and scores and we should be good
-            self.data_struct.update_tensor("rec.items", topk_idx)
+            self.data_struct.update_tensor("rec.items", torch.tensor(topk_idx, device=scores_tensor.device))
 
         if self.register.need("rec.topk"):
             if self.config["with_fa_ir"]:

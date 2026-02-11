@@ -44,25 +44,24 @@ class LightGCN(DebiasedRecommender):
 
     def __init__(self, config, dataset, state_dict=None):
         super(LightGCN, self).__init__(config, dataset, state_dict)
+        # load dataset info
+        self.interaction_matrix = dataset.inter_matrix(form="coo").astype(np.float32)
+        
+        # load parameters info
+        self.latent_dim = config[
+            "embedding_size"
+        ]  # int type:the embedding size of lightGCN
+        self.n_layers = config["n_layers"]  # int type:the layer num of lightGCN
+        # TODO ask Masoud how to handle this
+        self.reg_weight = config[
+            "reg_weight"
+        ]  # float32 type: the weight decay for l2 normalization
+        self.require_pow = config["require_pow"]
 
         if state_dict:
             self.user_embedding = torch.nn.Embedding.from_pretrained(state_dict["user_embedding.weight"])
             self.item_embedding = torch.nn.Embedding.from_pretrained(state_dict["item_embedding.weight"])
         else:
-            # load dataset info
-            self.interaction_matrix = dataset.inter_matrix(form="coo").astype(np.float32)
-
-            # load parameters info
-            self.latent_dim = config[
-                "embedding_size"
-            ]  # int type:the embedding size of lightGCN
-            self.n_layers = config["n_layers"]  # int type:the layer num of lightGCN
-            # TODO ask Masoud how to handle this
-            self.reg_weight = config[
-                "reg_weight"
-            ]  # float32 type: the weight decay for l2 normalization
-            self.require_pow = config["require_pow"]
-
             self.user_embedding = torch.nn.Embedding(
                 num_embeddings=self.n_users, embedding_dim=self.latent_dim
             )

@@ -239,7 +239,7 @@ def objective_function(config_dict=None, config_file_list=None, saved=True):
     }
 
 
-def load_data_and_model(model_file):
+def load_data_and_model(model_file, root: str):
     r"""Load filtered dataset, split dataloaders and saved model.
 
     Args:
@@ -258,12 +258,16 @@ def load_data_and_model(model_file):
 
     checkpoint = torch.load(model_file, weights_only=False)
     config = checkpoint["config"]
+    data_path: str = config.final_config_dict["data_path"]
+    data_path = data_path.replace("/scratch/ppetrov1/algorithmic-bias/", root)
+    config.final_config_dict["data_path"] = data_path
     init_seed(config["seed"], config["reproducibility"])
     init_logger(config)
     logger = getLogger()
     logger.info(config)
 
     dataset = create_dataset(config)
+    dataset.build_rel_sets()
     logger.info(dataset)
     train_data, valid_data, test_data = data_preparation(config, dataset)
 
