@@ -264,11 +264,11 @@ def load_data_and_model(model_file, root: str):
     init_seed(config["seed"], config["reproducibility"])
     init_logger(config)
     logger = getLogger()
-    logger.info(config)
+    # logger.info(config)
 
     dataset = create_dataset(config)
     dataset.build_rel_sets()
-    logger.info(dataset)
+    # logger.info(dataset)
     train_data, valid_data, test_data = data_preparation(config, dataset)
 
     init_seed(config["seed"], config["reproducibility"])

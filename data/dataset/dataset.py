@@ -120,7 +120,7 @@ class Dataset(torch.utils.data.Dataset):
 
         if config["use_WTD"]:
             # TODO perhaps we should calculate the tail and head sets ahead of time in case WTD is messing with this too much
-            self.logger.info("Sampling dataset with WTD.")
+            # self.logger.info("Sampling dataset with WTD.")
             self._build_WTD_w()
 
         self.build_protected_map = True
@@ -2448,7 +2448,7 @@ class Dataset(torch.utils.data.Dataset):
             p_user_mnar, p_item_mnar = self._calc_set_probs(MNAR)
             p_user_mar, p_item_mar = self._calc_set_probs(MAR)
         else:
-            self.logger.warning("Using WTD_H (MAR ~ |1/N|).")
+            # self.logger.warning("Using WTD_H (MAR ~ |1/N|).")
 
             n_u = self.user_num
             n_i = self.item_num
