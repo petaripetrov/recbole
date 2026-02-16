@@ -239,7 +239,7 @@ def objective_function(config_dict=None, config_file_list=None, saved=True):
     }
 
 
-def load_data_and_model(model_file, root: str):
+def load_data_and_model(model_file, root: str, device: str):
     r"""Load filtered dataset, split dataloaders and saved model.
 
     Args:
@@ -256,7 +256,7 @@ def load_data_and_model(model_file, root: str):
     """
     import torch
 
-    checkpoint = torch.load(model_file, weights_only=False)
+    checkpoint = torch.load(model_file, weights_only=False, map_location=torch.device(device))
     config = checkpoint["config"]
     data_path: str = config.final_config_dict["data_path"]
     data_path = data_path.replace("/scratch/ppetrov1/algorithmic-bias/", root)

@@ -204,7 +204,7 @@ class Collector(object):
                     scores_tensor, max(self.topk), dim=-1
                 )  # n_users x k
             # TODO apply FA*IR here, we need access to the prot object and scores and we should be good
-            self.data_struct.update_tensor("rec.items", torch.tensor(topk_idx, device=scores_tensor.device))
+            self.data_struct.update_tensor("rec.items", topk_idx, device=scores_tensor.device)
 
         if self.register.need("rec.topk"):
             if self.config["with_fa_ir"]:
