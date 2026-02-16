@@ -261,6 +261,8 @@ def load_data_and_model(model_file, root: str, device: str):
     data_path: str = config.final_config_dict["data_path"]
     data_path = data_path.replace("/scratch/ppetrov1/algorithmic-bias/", root)
     config.final_config_dict["data_path"] = data_path
+    config.final_config_dict["device"] = device
+    
     init_seed(config["seed"], config["reproducibility"])
     init_logger(config)
     logger = getLogger()
