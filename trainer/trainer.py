@@ -630,7 +630,7 @@ class Trainer(AbstractTrainer):
                 )
 
             if self.config["equalize_attention"]:
-                scores = self.equalize_attention(scores, self.protected_map, 2)
+                scores = self.equalize_attention(scores, self.protected_map, len(self.protected_map.unique()))
 
             self.eval_collector.eval_batch_collect(
                 scores, interaction, positive_u, positive_i
