@@ -239,7 +239,7 @@ def objective_function(config_dict=None, config_file_list=None, saved=True):
     }
 
 
-def load_data_and_model(model_file, root: str, device: str):
+def load_data_and_model(model_file, root: str, device: str, skip_dataset: bool = False):
     r"""Load filtered dataset, split dataloaders and saved model.
 
     Args:
@@ -268,12 +268,12 @@ def load_data_and_model(model_file, root: str, device: str):
     logger = getLogger()
     # logger.info(config)
 
-    dataset = create_dataset(config)
-    dataset.build_rel_sets()
-    # logger.info(dataset)
-    train_data, valid_data, test_data = data_preparation(config, dataset)
+    if not skip_dataset:
+        dataset = create_dataset(config)
+        dataset.build_rel_sets()
+        # logger.info(dataset)
+        train_data, valid_data, test_data = data_preparation(config, dataset)
 
-    init_seed(config["seed"], config["reproducibility"])
     model = get_model(config["model"])(config, train_data._dataset).to(device)
     model.load_state_dict(checkpoint["state_dict"])
     model.load_other_parameter(checkpoint.get("other_parameter"))
