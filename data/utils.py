@@ -21,8 +21,9 @@ from typing import Literal
 
 from recbole.data.dataloader import *
 from recbole.sampler import KGSampler, RepeatableSampler, Sampler
-from recbole.utils import ModelType, ensure_dir, get_local_time, set_color
+from recbole.utils import ModelType, ensure_dir, set_color
 from recbole.utils.argument_list import dataset_arguments
+from scripts.utils import calculate_weights, MAR_DATASETS, weighted_intervention
 
 
 def create_dataset(config):
@@ -163,6 +164,9 @@ def data_preparation(config, dataset):
         dataset._change_feat_format()
     else:
         model_type = config["MODEL_TYPE"]
+        items = set(dataset.inter_feat["item_id"])
+        users = set(dataset.inter_feat["user_id"])
+
         built_datasets = dataset.build()
 
         train_dataset, valid_dataset, test_dataset = built_datasets
@@ -171,10 +175,21 @@ def data_preparation(config, dataset):
             # Apply WTD here by first extracting the p_mnar and p_mar probabilities
             # train -> p_mnar
             # test -> p_mar (gets replaced with ideal under ML-1m)
-            train_dataset.weighted_intervention_p()
-            valid_dataset.weighted_intervention_p()
-            test_dataset.weighted_intervention_p()
-
+            w_users, w_items = calculate_weights(train_dataset.inter_feat, 
+                                                 test_dataset.inter_feat, 
+                                                 config["dataset"] in MAR_DATASETS, 
+                                                 users, items)
+            
+            # TODO discuss with Masoud whether we should do this on the dataset
+            # aka kinda ass, or also on the testset/only testset
+            keep, _ = weighted_intervention(test_dataset,
+                                            w_users,
+                                            w_items,
+                                            0.5)
+            
+            
+            test_dataset.inter_feat = keep
+            
         train_sampler, valid_sampler, test_sampler = create_samplers(
             config, dataset, built_datasets
         )
