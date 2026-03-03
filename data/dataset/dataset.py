@@ -121,7 +121,7 @@ class Dataset(torch.utils.data.Dataset):
         if config["use_WTD"]:
             # TODO perhaps we should calculate the tail and head sets ahead of time in case WTD is messing with this too much
             # self.logger.info("Sampling dataset with WTD.")
-            self._build_WTD_w()
+            self.calculate_weights_p()
 
         self.build_protected_map = True
 
@@ -2419,7 +2419,8 @@ class Dataset(torch.utils.data.Dataset):
 
             self.protected_map = protected_map
 
-    def apply_WTD(self):
+            
+    def weighted_intervention(self):
         w = self.WTD_w[: self.inter_num]
 
         w = w / w.sum()
@@ -2432,7 +2433,7 @@ class Dataset(torch.utils.data.Dataset):
             new_inter = self.inter_feat.iloc[idx]
         self.inter_feat = new_inter
 
-    def _build_WTD_w(self):
+    def calculate_weights(self):
         u_all = self.inter_feat["user_id"].to_numpy()
         i_all = self.inter_feat["item_id"].to_numpy()
 
@@ -2472,3 +2473,99 @@ class Dataset(torch.utils.data.Dataset):
         return np.clip(user_counts / user_counts.sum(), eps, None), np.clip(
             item_counts / item_counts.sum(), eps, None
         )
+
+    def weighted_intervention_p(self):
+        w = self.WTD_w[: self.inter_num]
+
+        idx = np.random.choice(len(w), size=len(w), replace=False, p=w)
+
+        if isinstance(self.inter_feat, Interaction):
+            new_inter = self.inter_feat[idx]
+        else:
+            new_inter = self.inter_feat.iloc[idx]
+        self.inter_feat = new_inter
+
+    def calculate_weights_p(self):
+        u_all = self.inter_feat["user_id"].to_numpy()
+        i_all = self.inter_feat["item_id"].to_numpy()
+
+        if "intervene_mask" in self.inter_feat:
+            mask = {
+                key.item(): val
+                for key, val in self.field2token_id["intervene_mask"].items()
+            }
+
+            MNAR = self.inter_feat[self.inter_feat["intervene_mask"] == mask["False"]]
+            MAR = self.inter_feat[self.inter_feat["intervene_mask"] == mask["True"]]
+
+            p_user_mnar, p_item_mnar = self._calc_set_probs_p(MNAR)
+            p_user_mar, p_item_mar = self._calc_set_probs_p(MAR)
+        else:
+            # self.logger.warning("Using WTD_H (MAR ~ |1/N|).")
+
+            n_u = self.user_num
+            n_i = self.item_num
+
+            p_user_mnar, p_item_mnar = self._calc_set_probs_p(self.inter_feat)
+            p_user_mar, p_item_mar = self._calc_set_probs_p()
+            
+        # Weight calculation
+        w_users = {}
+        t_usrs = 0
+        for i in set(u_all):
+            p = p_user_mar[i] / p_user_mnar[i]
+            t_usrs += p
+            
+            w_users[i] = p
+
+        w_items = {}
+        t_itms = 0
+        for i in set(i_all):
+            p = p_item_mar[i] / p_item_mnar[i]
+            t_itms += p
+
+            w_items[i] = p
+
+        # Normalize
+        for i in w_users.keys():
+            w_users[i] = w_users[i] / t_usrs
+
+        for i in w_items.keys():
+            w_items[i] = w_items[i] / t_usrs
+            
+        w = np.zeros(len(MNAR))
+        
+        for ix, row in MNAR.iterrows():
+            w[ix] = w_users[row['user_id']] * w_items[row["item_id"]]
+            
+        self.WTD_w = w
+
+    def _calc_set_probs_p(self, data: pd.DataFrame, eps=1e-12):
+        n = len(data)
+        itms = set(data["item_id"].values)
+        usrs = set(data["user_id"].values)
+
+        # # Wait so is this actually sampling by popularity? or not
+        # user_counts = np.bincount(data["user_id"].values)
+        # # p_u_o = user_counts / user_counts.sum() 
+        # item_counts = np.bincount(data["item_id"].values)
+        # # p_i_o = item_counts / item_counts.sum() 
+        
+        p_i_o = {}
+        ideal_i = 1 / len(itms)
+        for item in itms:
+            p_i_o[item] = len(data[data["item_id"] == item]) / n
+            
+            if p_i_o[item] == 0:
+                p_i_o[item] == eps
+                
+        p_u_o = {}
+        ideal_u = 1 / len(usrs)
+        for user in usrs:
+            p_u_o[user] = len(data[data["item_id"] == user]) / n
+            
+            if p_u_o[user] == 0:
+                p_u_o[user] == eps
+        
+        return p_u_o, p_i_o
+

@@ -463,6 +463,8 @@ class Trainer(AbstractTrainer):
             )
 
             # eval
+            t = self.eval_step <= 0 
+            a = not valid_data
             if self.eval_step <= 0 or not valid_data:
                 if saved:
                     self._save_checkpoint(epoch_idx, verbose=verbose)

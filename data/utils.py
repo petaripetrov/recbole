@@ -168,7 +168,12 @@ def data_preparation(config, dataset):
         train_dataset, valid_dataset, test_dataset = built_datasets
 
         if config["use_WTD"]:
-            train_dataset.apply_WTD()
+            # Apply WTD here by first extracting the p_mnar and p_mar probabilities
+            # train -> p_mnar
+            # test -> p_mar (gets replaced with ideal under ML-1m)
+            train_dataset.weighted_intervention_p()
+            valid_dataset.weighted_intervention_p()
+            test_dataset.weighted_intervention_p()
 
         train_sampler, valid_sampler, test_sampler = create_samplers(
             config, dataset, built_datasets
