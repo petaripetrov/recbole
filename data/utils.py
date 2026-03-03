@@ -174,10 +174,10 @@ def data_preparation(config, dataset):
         if config["use_WTD"]:
             # Apply WTD here by first extracting the p_mnar and p_mar probabilities
             # train -> p_mnar
-            # test -> p_mar (gets replaced with ideal under ML-1m)
+            # test -> p_mar (gets replaced with ideal under any Dataset without MAR)
             w_users, w_items = calculate_weights(train_dataset.inter_feat, 
                                                  test_dataset.inter_feat, 
-                                                 config["dataset"] in MAR_DATASETS, 
+                                                 config["dataset"] not in MAR_DATASETS, 
                                                  users, items)
             
             # TODO discuss with Masoud whether we should do this on the dataset
@@ -185,11 +185,12 @@ def data_preparation(config, dataset):
             keep, _ = weighted_intervention(test_dataset,
                                             w_users,
                                             w_items,
-                                            0.5)
+                                            0.5) # this is what they use in the paper
+
             
             
             test_dataset.inter_feat = keep
-            
+        
         train_sampler, valid_sampler, test_sampler = create_samplers(
             config, dataset, built_datasets
         )
