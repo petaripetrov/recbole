@@ -184,18 +184,23 @@ class Collector(object):
         if self.register.need("rec.items"):
             # get topk
             if self.config["with_fa_ir"]:
+                FAIR_SIZE = min(100, len(scores_tensor[0]))
                 _, order_idx = torch.topk(
-                    scores_tensor, len(scores_tensor[0]), dim=-1
+                    scores_tensor, FAIR_SIZE, dim=-1
                 )  # n_users x k
+                
                 prot_map = self.data_struct.get("data.prot_map")
-
+                r_len = order_idx.shape[1]
+                
                 topk_idx = []
                 for ranking in order_idx:
-                    r_len = len(ranking)
-
-                    mapped = [FairScoreDoc(ranking[i].item(), r_len - i, bool(prot_map[i])) for i in range(r_len)]
+                    ranking_list = ranking.tolist()
+                    
+                    mapped = [
+                        FairScoreDoc(item_id, idx, prot_map[item_id] == 1)
+                        for idx, item_id in enumerate(ranking_list)]
+                    
                     reranked = self.fair.re_rank(mapped)
-
                     topk_idx.append([r.id for r in reranked[:max(self.topk)]])
                 
                 topk_idx = torch.tensor(topk_idx, device=scores_tensor.device)

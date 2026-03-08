@@ -185,9 +185,7 @@ def data_preparation(config, dataset):
             keep, _ = weighted_intervention(test_dataset,
                                             w_users,
                                             w_items,
-                                            0.5) # this is what they use in the paper
-
-            
+                                            0.2) # this is what they use in the paper
             
             test_dataset.inter_feat = keep
         
