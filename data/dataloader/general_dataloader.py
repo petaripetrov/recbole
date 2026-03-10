@@ -245,14 +245,14 @@ class FullSortEvalDataLoader(AbstractDataLoader):
 
     def _init_batch_size_and_step(self):
         batch_size = self.config["eval_batch_size"]
-        if not self.is_sequential:
-            batch_num = max(batch_size // self._dataset.item_num, 1)
-            new_batch_size = batch_num * self._dataset.item_num
-            self.step = batch_num
-            self.set_batch_size(new_batch_size)
-        else:
-            self.step = batch_size
-            self.set_batch_size(batch_size)
+        # if not self.is_sequential:
+        #     batch_num = max(batch_size // self._dataset.item_num, 1)
+        #     new_batch_size = batch_num * self._dataset.item_num
+        #     self.step = batch_num
+        #     self.set_batch_size(new_batch_size)
+        # else:
+        self.step = batch_size
+        self.set_batch_size(batch_size)
 
     def update_config(self, config):
         super().update_config(config)
