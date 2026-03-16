@@ -3,7 +3,7 @@ from recbole.model.general_recommender._bpr import _BPR
 from recbole.model.general_recommender.cdae import CDAE
 from recbole.model.general_recommender.convncf import ConvNCF
 from recbole.model.general_recommender.dgcf import DGCF
-from recbole.model.general_recommender.dmf import DMF
+from recbole.model.general_recommender._dmf import _DMF
 from recbole.model.general_recommender.ease import EASE
 from recbole.model.general_recommender.enmf import ENMF
 from recbole.model.general_recommender.fism import FISM

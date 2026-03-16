@@ -40,6 +40,7 @@ class LightGCN(DebiasedRecommender):
     We implement the model following the original author with a pairwise training mode.
     """
 
+    # TODO 
     input_type = InputType.PAIRWISE
 
     def __init__(self, config, dataset, state_dict=None):
@@ -149,7 +150,7 @@ class LightGCN(DebiasedRecommender):
         ego_embeddings = torch.cat([user_embeddings, item_embeddings], dim=0)
         return ego_embeddings
 
-    def forward(self):
+    def forward(self, user=None, pos_item=None):
         all_embeddings = self.get_ego_embeddings()
         embeddings_list = [all_embeddings]
 
@@ -162,7 +163,7 @@ class LightGCN(DebiasedRecommender):
         user_all_embeddings, item_all_embeddings = torch.split(
             lightgcn_all_embeddings, [self.n_users, self.n_items]
         )
-        return user_all_embeddings, item_all_embeddings
+        return None, user_all_embeddings, item_all_embeddings
 
     def _calculate_loss(self, interaction):
         # clear the storage variable when training
@@ -173,7 +174,7 @@ class LightGCN(DebiasedRecommender):
         pos_item = interaction[self.ITEM_ID]
         neg_item = interaction[self.NEG_ITEM_ID]
 
-        user_all_embeddings, item_all_embeddings = self.forward()
+        _, user_all_embeddings, item_all_embeddings = self.forward()
         u_embeddings = user_all_embeddings[user]
         pos_embeddings = item_all_embeddings[pos_item]
         neg_embeddings = item_all_embeddings[neg_item]
@@ -203,7 +204,7 @@ class LightGCN(DebiasedRecommender):
         user = interaction[self.USER_ID]
         item = interaction[self.ITEM_ID]
 
-        user_all_embeddings, item_all_embeddings = self.forward()
+        _, user_all_embeddings, item_all_embeddings = self.forward()
 
         u_embeddings = user_all_embeddings[user]
         i_embeddings = item_all_embeddings[item]
@@ -213,7 +214,7 @@ class LightGCN(DebiasedRecommender):
     def full_sort_predict(self, interaction):
         user = interaction[self.USER_ID]
         if self.restore_user_e is None or self.restore_item_e is None:
-            self.restore_user_e, self.restore_item_e = self.forward()
+            _, self.restore_user_e, self.restore_item_e = self.forward()
         # get user embedding from storage variable
         u_embeddings = self.restore_user_e[user]
 

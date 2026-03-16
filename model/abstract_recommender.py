@@ -20,6 +20,7 @@ import torch.nn as nn
 
 from recbole.data.interaction import Interaction
 from recbole.model.layers import FLEmbedding, FMEmbedding, FMFirstOrderLinear
+from recbole.model.loss import BPRLoss, EmbLoss, RegLoss
 from recbole.utils import FeatureSource, FeatureType, InputType, ModelType, set_color
 
 
@@ -630,6 +631,10 @@ class DebiasedRecommender(AbstractRecommender):
     The base general recommender class provide the basic dataset and parameters information.
     """
 
+    """
+    TODO add the PDA portion to the actual prediction
+    """
+
     type = ModelType.GENERAL
 
     def __init__(self, config, dataset, state_dict=None):
@@ -640,6 +645,7 @@ class DebiasedRecommender(AbstractRecommender):
         self.ITEM_ID = config["ITEM_ID_FIELD"]
         self.PROPENSITIES = config["PROPENSITY_FIELD"]
         self.NEG_ITEM_ID = config["NEG_PREFIX"] + self.ITEM_ID
+        self.LABEL = config["LABEL_FIELD"]
         self.n_users = dataset.num(self.USER_ID)
         self.n_items = dataset.num(self.ITEM_ID)
 
@@ -647,10 +653,46 @@ class DebiasedRecommender(AbstractRecommender):
         self.propensity_score, self.column = dataset.estimate_pscore()
         self.use_precomp_prop = config["use_precomp_prop"]
 
+        self.use_PDA = config["use_PDA"]
+
+        if self.use_PDA:
+            self.reg_weight = config["reg_weight"]
+            self.elu = nn.ELU()
+            self.loss = BPRLoss()
+            self.reg_loss = EmbLoss() # Wrong not actually changed but should still discuss: different from https://github.com/JingsenZhang/Recbole-Debias/blob/master/recbole_debias/model/debiased_recommender/pda.py but closer to the paper
+
         # load parameters info
         self.device = config["device"]
 
+    def forward(self, user, item) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+        pass
+
+    def get_user_embedding(self, user: torch.Tensor) -> torch.Tensor:
+        """[B] -> [B, D]. Required for PDA."""
+        raise NotImplementedError
+
+    def get_item_embedding(self, item: torch.Tensor) -> torch.Tensor:
+        """[B] -> [B, D]. Required for PDA."""
+        raise NotImplementedError
+
+    def split_items(self, interaction: Interaction) -> torch.Tensor:
+        if self.NEG_ITEM_ID in interaction:
+            return interaction[self.ITEM_ID], interaction[self.NEG_ITEM_ID]
+        
+        label = interaction[self.LABEL]
+        items = interaction[self.ITEM_ID]
+
+        pos_mask = label == 1
+        neg_mask = label == 0
+
+        pos_i = items[pos_mask]
+        neg_i = items[neg_mask]
+
+        return pos_i, neg_i
+
     def _calculate_loss(self, interaction: Interaction) -> torch.Tensor:
+        """Default loss calculation
+        """
         raise NotImplementedError
         
 
@@ -666,8 +708,27 @@ class DebiasedRecommender(AbstractRecommender):
                 ].to(self.device)
 
             return torch.mean(
-                1 / (weight + 1e-7) * loss
+              (1 / (weight + 1e-7)) * loss
             )
+        elif self.use_PDA:
+            user = interaction[self.USER_ID]
+            pos_item, neg_item = self.split_items(interaction)
+            
+            _, user_e, pos_e = self.forward(user, pos_item)
+            neg_e = self.get_item_embedding(neg_item)
+
+            pos_item_weight = self.propensity_score.to(self.device)[pos_item]
+            neg_item_weight = self.propensity_score.to(self.device)[neg_item]
+
+            pos_score = self.elu(torch.mul(user_e, pos_e).sum(dim=1)) # eq 4 different from https://github.com/JingsenZhang/Recbole-Debias/blob/master/recbole_debias/model/debiased_recommender/pda.py
+            pos_score = pos_score * pos_item_weight # eq 9
+            neg_score = self.elu(torch.mul(user_e, pos_e).sum(dim=1)) # https://github.com/JingsenZhang/Recbole-Debias/blob/master/recbole_debias/model/debiased_recommender/pda.py
+            neg_score = neg_score * neg_item_weight
+
+            loss = self.loss(pos_score, neg_score)
+            reg_loss = self.reg_weight * self.reg_loss(user_e, pos_e, neg_e)
+            
+            return loss + reg_loss
 
         return loss
 

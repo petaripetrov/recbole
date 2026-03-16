@@ -20,12 +20,12 @@ import torch
 import torch.nn as nn
 from torch.nn.init import normal_
 
-from recbole.model.abstract_recommender import GeneralRecommender
+from recbole.model.abstract_recommender import DebiasedRecommender
 from recbole.model.layers import MLPLayers
 from recbole.utils import InputType
 
 
-class DMF(GeneralRecommender):
+class DMF(DebiasedRecommender):
     r"""DMF is an neural network enhanced matrix factorization model.
     The original interaction matrix of :math:`n_{users} \times n_{items}` is set as model input,
     we carefully design the data interface and use sparse tensor to train and test efficiently.
@@ -38,7 +38,14 @@ class DMF(GeneralRecommender):
         final score of user's and item's embedding.
     """
 
-    input_type = InputType.POINTWISE
+    """
+    Changes TLDR:
+    - Switched to PAIRWISE and modified loss to factor in both positive and negative items.
+    It appears this also resulted in an increase on some of the metrics. Could be because we are 
+    doubling the tensors, exposing items both as positive and negative?
+    """
+
+    input_type = InputType.PAIRWISE
 
     def __init__(self, config, dataset):
         super(DMF, self).__init__(config, dataset)
@@ -152,29 +159,58 @@ class DMF(GeneralRecommender):
         # cosine distance is replaced by dot product according the result of our experiments.
         vector = torch.mul(user, item).sum(dim=1)
 
-        return vector
-
-    def calculate_loss(self, interaction):
+        return vector, user, item
+    
+    def _calculate_loss(self, interaction):
         # when starting a new epoch, the item embedding we saved must be cleared.
         if self.training:
             self.i_embedding = None
 
         user = interaction[self.USER_ID]
-        item = interaction[self.ITEM_ID]
+        pos_item = interaction[self.ITEM_ID]
+        neg_item = interaction[self.NEG_ITEM_ID]
+
+        user = torch.cat([user, user])
+        item = torch.cat([pos_item, neg_item])
+        label = torch.cat([
+            torch.ones_like(pos_item, device=self.device),
+            torch.zeros_like(neg_item, device=self.device)
+        ])
+
         if self.inter_matrix_type == "01":
-            label = interaction[self.LABEL]
+            label = label
         elif self.inter_matrix_type == "rating":
-            label = interaction[self.RATING] * interaction[self.LABEL]
-        output = self.forward(user, item)
+            t = torch.cat([interaction[self.RATING], interaction[self.RATING]])
+            t *= label
+            label =  t
+        output, _, _ = self.forward(user, item)
 
         label = label / self.max_rating  # normalize the label to calculate BCE loss.
         loss = self.bce_loss(output, label)
         return loss
 
+    # def _calculate_loss(self, interaction):
+    #     # when starting a new epoch, the item embedding we saved must be cleared.
+    #     if self.training:
+    #         self.i_embedding = None
+
+    #     user = interaction[self.USER_ID]
+    #     item = interaction[self.ITEM_ID]
+    #     if self.inter_matrix_type == "01":
+    #         label = interaction[self.LABEL]
+    #     elif self.inter_matrix_type == "rating":
+    #         label = interaction[self.RATING] * interaction[self.LABEL]
+    #     output = self.forward(user, item)
+
+    #     label = label / self.max_rating  # normalize the label to calculate BCE loss.
+    #     loss = self.bce_loss(output, label)
+    #     return loss
+
     def predict(self, interaction):
         user = interaction[self.USER_ID]
         item = interaction[self.ITEM_ID]
-        predict = self.sigmoid(self.forward(user, item))
+        output, _, _ = self.forward(user, item)
+        predict = self.sigmoid(output)
         return predict
 
     def get_user_embedding(self, user):
@@ -200,7 +236,7 @@ class DMF(GeneralRecommender):
 
         return user
 
-    def get_item_embedding(self):
+    def _get_item_embedding(self):
         r"""Get all item's embedding with history interaction matrix.
 
         Considering the RAM of device, we use matrix multiply on sparse tensor for generalization.
@@ -222,6 +258,21 @@ class DMF(GeneralRecommender):
 
         item = self.item_fc_layers(item)
         return item
+    
+    def get_item_embedding(self, item):
+        col_indices = self.history_user_id[item].flatten()
+        row_indices = (
+            torch.arange(item.shape[0])
+            .to(self.device)
+            .repeat_interleave(self.history_user_id.shape[1], dim=0)
+        )
+        matrix_01 = torch.zeros(1).to(self.device).repeat(item.shape[0], self.n_users)
+        matrix_01.index_put_(
+            (row_indices, col_indices), self.history_user_value[item].flatten()
+        )
+        item = self.item_linear(matrix_01)
+
+        return item
 
     def full_sort_predict(self, interaction):
         user = interaction[self.USER_ID]
@@ -229,7 +280,7 @@ class DMF(GeneralRecommender):
         u_embedding = self.user_fc_layers(u_embedding)
 
         if self.i_embedding is None:
-            self.i_embedding = self.get_item_embedding()
+            self.i_embedding = self._get_item_embedding()
 
         similarity = torch.mm(u_embedding, self.i_embedding.t())
         similarity = self.sigmoid(similarity)

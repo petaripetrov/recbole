@@ -76,14 +76,17 @@ class BPR(DebiasedRecommender):
     def forward(self, user, item):
         user_e = self.get_user_embedding(user)
         item_e = self.get_item_embedding(item)
-        return user_e, item_e
+        return None, user_e, item_e
 
     def _calculate_loss(self, interaction):
         user = interaction[self.USER_ID]
-        pos_item = interaction[self.ITEM_ID]
-        neg_item = interaction[self.NEG_ITEM_ID]
+        pos_item: torch.Tensor = interaction[self.ITEM_ID]
+        neg_item: torch.Tensor = interaction[self.NEG_ITEM_ID]
 
-        user_e, pos_e = self.forward(user, pos_item)
+        if (neg_item == pos_item).any():
+            p = ""
+
+        _, user_e, pos_e = self.forward(user, pos_item)
         neg_e = self.get_item_embedding(neg_item)
         pos_item_score, neg_item_score = (
             torch.mul(user_e, pos_e).sum(dim=1),
@@ -95,7 +98,7 @@ class BPR(DebiasedRecommender):
     def predict(self, interaction):
         user = interaction[self.USER_ID]
         item = interaction[self.ITEM_ID]
-        user_e, item_e = self.forward(user, item)
+        _, user_e, item_e = self.forward(user, item)
         return torch.mul(user_e, item_e).sum(dim=1)
 
     def full_sort_predict(self, interaction):
