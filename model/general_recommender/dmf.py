@@ -150,6 +150,7 @@ class DMF(GeneralRecommender):
         item = self.item_fc_layers(item)
 
         # cosine distance is replaced by dot product according the result of our experiments.
+        # Cut off here and repeat this line elsewhere 
         vector = torch.mul(user, item).sum(dim=1)
 
         return vector

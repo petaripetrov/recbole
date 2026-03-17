@@ -121,23 +121,23 @@ class NegSampleEvalDataLoader(NegSampleDataLoader):
 
     def _init_batch_size_and_step(self):
         batch_size = self.config["eval_batch_size"]
-        if (
-            self.neg_sample_args["distribution"] != "none"
-            and self.neg_sample_args["sample_num"] != "none"
-        ):
-            inters_num = sorted(self.uid2items_num * self.times, reverse=True)
-            batch_num = 1
-            new_batch_size = inters_num[0]
-            for i in range(1, len(inters_num)):
-                if new_batch_size + inters_num[i] > batch_size:
-                    break
-                batch_num = i + 1
-                new_batch_size += inters_num[i]
-            self.step = batch_num
-            self.set_batch_size(new_batch_size)
-        else:
-            self.step = batch_size
-            self.set_batch_size(batch_size)
+        # if (
+        #     self.neg_sample_args["distribution"] != "none"
+        #     and self.neg_sample_args["sample_num"] != "none"
+        # ):
+        #     inters_num = sorted(self.uid2items_num * self.times, reverse=True)
+        #     batch_num = 1
+        #     new_batch_size = inters_num[0]
+        #     for i in range(1, len(inters_num)):
+        #         if new_batch_size + inters_num[i] > batch_size:
+        #             break
+        #         batch_num = i + 1
+        #         new_batch_size += inters_num[i]
+        #     self.step = batch_num
+        #     self.set_batch_size(new_batch_size)
+        # else:
+        self.step = batch_size
+        self.set_batch_size(batch_size)
 
     def update_config(self, config):
         phase = self._sampler.phase if self._sampler.phase is not None else "test"

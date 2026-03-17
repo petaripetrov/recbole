@@ -24,7 +24,7 @@ from recbole.sampler import KGSampler, RepeatableSampler, Sampler
 from recbole.utils import ModelType, ensure_dir, set_color
 from recbole.utils.argument_list import dataset_arguments
 from scripts.utils import calculate_weights, MAR_DATASETS, weighted_intervention
-
+from recbole.sampler import DICESampler
 
 def create_dataset(config):
     """Create dataset according to :attr:`config['model']` and :attr:`config['MODEL_TYPE']`.
@@ -329,6 +329,7 @@ def _get_AE_dataloader(config, phase: Literal["train", "valid", "test", "evaluat
 
 def _create_sampler(
     dataset,
+    model: str,
     built_datasets,
     distribution: str,
     repeatable: bool,
@@ -341,6 +342,15 @@ def _create_sampler(
         if base_sampler is not None:
             base_sampler.set_distribution(distribution)
             return base_sampler
+        
+        if model == "DICE":
+            sampler = DICESampler(
+                phases,
+                built_datasets,
+                distribution,
+                alpha
+            )
+        
         if not repeatable:
             sampler = Sampler(
                 phases,
@@ -379,6 +389,7 @@ def create_samplers(config, dataset, built_datasets):
     repeatable = config["repeatable"]
     base_sampler = _create_sampler(
         dataset,
+        config["model"],
         built_datasets,
         train_neg_sample_args["distribution"],
         repeatable,
@@ -388,6 +399,7 @@ def create_samplers(config, dataset, built_datasets):
 
     valid_sampler = _create_sampler(
         dataset,
+        config["model"],
         built_datasets,
         valid_neg_sample_args["distribution"],
         repeatable,
@@ -397,6 +409,7 @@ def create_samplers(config, dataset, built_datasets):
 
     test_sampler = _create_sampler(
         dataset,
+        config["model"],
         built_datasets,
         test_neg_sample_args["distribution"],
         repeatable,
