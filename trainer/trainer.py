@@ -1648,7 +1648,7 @@ class FairGoTrainer(Trainer):
         if config['pretrain_model_file_path'] is not None:
             self.saved_pretrain_model_file = config['pretrain_model_file_path'] 
             checkpoint_file = config['pretrain_model_file_path']
-            checkpoint = torch.load(checkpoint_file)
+            checkpoint = torch.load(checkpoint_file, weights_only=False)
             self.model.load_state_dict(checkpoint['state_dict'])
             self.model.load_other_parameter(checkpoint.get('other_parameter'))
             message_output = 'Loading pretrain model structure and parameters from {}'.format(checkpoint_file)
@@ -1846,7 +1846,7 @@ class FairGoTrainer(Trainer):
 
         if load_best_model and not self.load_pretrain_weight:
             checkpoint_file = self.saved_pretrain_model_file
-            checkpoint = torch.load(checkpoint_file)
+            checkpoint = torch.load(checkpoint_file, weights_only=False)
             self.model.load_state_dict(checkpoint['state_dict'])
             self.model.load_other_parameter(checkpoint.get('other_parameter'))
             self.model.train_stage = 'pretrain'
@@ -1858,7 +1858,7 @@ class FairGoTrainer(Trainer):
 
         if load_best_model:
             checkpoint_file = model_file or self.saved_model_file
-            checkpoint = torch.load(checkpoint_file)
+            checkpoint = torch.load(checkpoint_file, weights_only=False)
             self.model.load_state_dict(checkpoint['state_dict'])
             self.model.load_other_parameter(checkpoint.get('other_parameter'))
             self.model.train_stage = 'finetune'
@@ -1912,7 +1912,7 @@ class FairGoTrainer(Trainer):
         """
         resume_file = str(resume_file)
         self.saved_model_file = resume_file
-        checkpoint = torch.load(resume_file)
+        checkpoint = torch.load(resume_file, weights_only=False)
         self.start_epoch = checkpoint['epoch'] + 1
         self.cur_step = checkpoint['cur_step']
         self.best_valid_score = checkpoint['best_valid_score']
@@ -2081,7 +2081,7 @@ class PFCNTrainer(Trainer):
 
         if load_best_model:
             checkpoint_file = model_file or self.saved_model_file
-            checkpoint = torch.load(checkpoint_file)
+            checkpoint = torch.load(checkpoint_file, weights_only=False)
             self.model.load_state_dict(checkpoint['state_dict'])
             self.model.load_other_parameter(checkpoint.get('other_parameter'))
             message_output = 'Loading model structure and parameters from {}'.format(checkpoint_file)
@@ -2150,7 +2150,7 @@ class PFCNTrainer(Trainer):
 
         if load_best_model:
             checkpoint_file = model_file or self.saved_model_file
-            checkpoint = torch.load(checkpoint_file)
+            checkpoint = torch.load(checkpoint_file, weights_only=False)
             self.model.load_state_dict(checkpoint['state_dict'])
             self.model.load_other_parameter(checkpoint.get('other_parameter'))
             message_output = 'Loading model structure and parameters from {}'.format(checkpoint_file)
@@ -2206,7 +2206,7 @@ class PFCNTrainer(Trainer):
 
     def _save_sst_embed(self, data):
         checkpoint_file = self.saved_model_file
-        checkpoint = torch.load(checkpoint_file)
+        checkpoint = torch.load(checkpoint_file, weights_only=False)
         self.model.load_state_dict(checkpoint['state_dict'])
         self.model.load_other_parameter(checkpoint.get('other_parameter'))
         self.model.eval()
@@ -2261,7 +2261,7 @@ class PFCNTrainer(Trainer):
         """
         resume_file = str(resume_file)
         self.saved_model_file = resume_file
-        checkpoint = torch.load(resume_file)
+        checkpoint = torch.load(resume_file, weights_only=False)
         self.start_epoch = checkpoint['epoch'] + 1
         self.cur_step = checkpoint['cur_step']
         self.best_valid_score = checkpoint['best_valid_score']
