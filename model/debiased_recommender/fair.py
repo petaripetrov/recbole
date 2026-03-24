@@ -4,6 +4,7 @@ from torch import nn
 from recbole.model.abstract_recommender import AbstractRecommender
 from recbole.model.loss import EmbLoss
 from recbole.utils.enum_type import InputType, ModelType
+from tqdm import tqdm
 
 
 class RegLossToOne(nn.Module):
@@ -345,9 +346,11 @@ class FAiR(AbstractRecommender):
             item_emb = self.item_filter(self.item_embedding_layer(item), training=True)
 
             rec_pred = self.forward(user, item, training=True)
-            ru_vectors = self.forward(sampled_users, sampled_items, training=True)
-            ru_vectors = ru_vectors.reshape(n_sampled_user, 1, self.n_item_samples)
-
+            
+            with torch.no_grad():
+                ru_vectors = self.forward(sampled_users, sampled_items, training=False)
+                ru_vectors = ru_vectors.reshape(n_sampled_user, 1, self.n_item_samples)
+                
             ru_pred = self.implicit_discriminator(ru_vectors)
             user_group_pred = self.user_explicit_discriminator(user_emb)
             item_group_pred = self.item_explicit_discriminator(item_emb)
@@ -356,7 +359,7 @@ class FAiR(AbstractRecommender):
                 self.rec_loss(rec_pred, y_true)
                 + self.l1 * self.user_d_loss(user_group_pred, user_group_true)
                 + self.l2 * self.item_d_loss(item_group_pred, item_group_true)
-                + self.l3 * self.im_d_loss(ru_pred, ru_labels)
+                + self.l3 * self.im_d_loss(ru_pred.reshape(ru_labels.shape), ru_labels)
                 # Filter losses from both user and item filters
                 # equivalent to tf.add_n(self.user_filter.losses) in original
                 + self.user_filter.alpha_reg_loss + self.user_filter.beta_reg_loss
