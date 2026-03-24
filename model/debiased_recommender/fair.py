@@ -183,9 +183,9 @@ class FAiR(AbstractRecommender):
         item_group = torch.zeros(self.n_items)
         # avg_rating_df = pd.DataFrame(df.groupby('item')['rating'].mean())
         avg_rating = dataset.avg_rating
-        self.register_buffer('user_group', torch.tensor(user_group, dtype=torch.int32).squeeze())
-        self.register_buffer('item_group', torch.tensor(item_group, dtype=torch.int32).squeeze())
-        self.register_buffer('average_rating', torch.tensor(avg_rating, dtype=torch.float32).squeeze())
+        self.register_buffer('user_group', torch.tensor(user_group.clone().detach().long().squeeze(), dtype=torch.int64).squeeze())
+        self.register_buffer('item_group', torch.tensor(item_group.clone().detach().long().squeeze(), dtype=torch.int64).squeeze())
+        self.register_buffer('average_rating', torch.tensor(avg_rating.clone().detach().long().squeeze(), dtype=torch.int64).squeeze())
 
         self.user_embedding_layer = nn.Embedding(self.n_users, dimension)
         self.item_embedding_layer = nn.Embedding(self.n_items, dimension)
@@ -205,7 +205,7 @@ class FAiR(AbstractRecommender):
         self.user_d_loss = nn.BCELoss()
         self.item_d_loss = nn.BCELoss()
         self.im_d_loss = nn.BCELoss()
-        self.rec_loss = nn.MSELoss()
+        self.rec_loss = nn.MSELoss() # torch.F.mse_loss()
 
         self.pretrain_optimizer = torch.optim.Adam(
             list(self.user_embedding_layer.parameters()) +
@@ -289,8 +289,8 @@ class FAiR(AbstractRecommender):
 
         with torch.no_grad():
             ru_vectors = self.forward(sampled_users, sampled_items, training=False)
-            ru_vectors = ru_vectors.reshape(self.n_user_samples, 1, self.n_item_samples)
-            ro_vectors = self.average_rating[sampled_item_ids].reshape(1, 1, self.n_item_samples)
+            ru_vectors = ru_vectors.reshape(self.n_user_samples, self.n_item_samples)
+            ro_vectors = self.average_rating[sampled_item_ids].reshape(1, self.n_item_samples)
 
         ru_labels = torch.zeros(self.n_user_samples, device=device)
         ro_labels = torch.ones(1, device=device)
@@ -349,7 +349,7 @@ class FAiR(AbstractRecommender):
             
             with torch.no_grad():
                 ru_vectors = self.forward(sampled_users, sampled_items, training=False)
-                ru_vectors = ru_vectors.reshape(n_sampled_user, 1, self.n_item_samples)
+                ru_vectors = ru_vectors.reshape(n_sampled_user, self.n_item_samples)
                 
             ru_pred = self.implicit_discriminator(ru_vectors)
             user_group_pred = self.user_explicit_discriminator(user_emb)
