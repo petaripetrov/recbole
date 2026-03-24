@@ -16,10 +16,10 @@ import torch.nn as nn
 from recbole.model.init import xavier_normal_initialization
 from recbole.model.loss import BPRLoss, RegLoss, EmbLoss
 from recbole.utils import InputType
-from recbole.model.abstract_recommender import DebiasedRecommender
+from recbole.model.abstract_recommender import IPSRecommender
 
 
-class PDA(DebiasedRecommender):
+class PDA(IPSRecommender):
     r"""
         Since the dataset does not have the condition to be divided by time period，we similarly define the global
     popularity of an item based on its interaction frequency in D.
@@ -43,6 +43,8 @@ class PDA(DebiasedRecommender):
         self.reg_loss = EmbLoss()
         self.elu = nn.ELU()
         self.propensity_score, self.column = dataset.estimate_pscore()
+
+        self.propensity_score = self.propensity_score.to(self.device)
 
         # parameters initialization
         self.apply(xavier_normal_initialization)

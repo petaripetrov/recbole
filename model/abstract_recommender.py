@@ -20,6 +20,7 @@ import torch.nn as nn
 
 from recbole.data.interaction import Interaction
 from recbole.model.layers import FLEmbedding, FMEmbedding, FMFirstOrderLinear
+from recbole.model.loss import EmbLoss
 from recbole.utils import FeatureSource, FeatureType, InputType, ModelType, set_color
 
 
@@ -625,7 +626,7 @@ from recbole.model.abstract_recommender import AbstractRecommender
 from recbole.utils import ModelType
 
 
-class DebiasedRecommender(AbstractRecommender):
+class IPSRecommender(AbstractRecommender):
     """This is a abstract general recommender. All the general model should implement this class.
     The base general recommender class provide the basic dataset and parameters information.
     """
@@ -633,7 +634,7 @@ class DebiasedRecommender(AbstractRecommender):
     type = ModelType.GENERAL
 
     def __init__(self, config, dataset, state_dict=None):
-        super(DebiasedRecommender, self).__init__()
+        super(IPSRecommender, self).__init__()
         
         # load dataset info
         self.USER_ID = config["USER_ID_FIELD"]
@@ -691,3 +692,5 @@ class FairRecommender(AbstractRecommender):
 
         # load parameters info
         self.device = config['device']
+
+

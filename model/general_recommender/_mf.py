@@ -16,10 +16,10 @@ import torch.nn as nn
 from recbole.model.init import xavier_normal_initialization
 from recbole.model.loss import BPRLoss
 from recbole.utils import InputType
-from recbole.model.abstract_recommender import DebiasedRecommender
+from recbole.model.abstract_recommender import IPSRecommender
 
 
-class _MF(DebiasedRecommender):
+class _MF(IPSRecommender):
     r"""
         MF model
     """

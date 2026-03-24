@@ -19,12 +19,12 @@ import torch
 import torch.nn as nn
 from torch.nn.init import normal_
 
-from recbole.model.abstract_recommender import DebiasedRecommender
+from recbole.model.abstract_recommender import IPSRecommender
 from recbole.model.layers import MLPLayers
 from recbole.utils import InputType
 
 
-class NeuMF(DebiasedRecommender):
+class NeuMF(IPSRecommender):
     r"""NeuMF is an neural network enhanced matrix factorization model.
     It replace the dot product to mlp for a more precise user-item interaction.
 

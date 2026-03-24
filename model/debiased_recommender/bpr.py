@@ -18,13 +18,13 @@ Reference:
 import torch
 import torch.nn as nn
 
-from recbole.model.abstract_recommender import DebiasedRecommender
+from recbole.model.abstract_recommender import IPSRecommender
 from recbole.model.init import xavier_normal_initialization
 from recbole.model.loss import BPRLoss
 from recbole.utils import InputType
 
 
-class BPR(DebiasedRecommender):
+class BPR(IPSRecommender):
     r"""BPR is a basic matrix factorization model that be trained in the pairwise way."""
 
     input_type = InputType.PAIRWISE

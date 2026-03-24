@@ -16,10 +16,10 @@ import torch.nn as nn
 from recbole.model.init import xavier_normal_initialization
 from recbole.utils import InputType
 from recbole.model.loss import RegLoss, EmbLoss
-from recbole.model.abstract_recommender import DebiasedRecommender
+from recbole.model.abstract_recommender import IPSRecommender
 
 
-class REL_MF(DebiasedRecommender):
+class REL_MF(IPSRecommender):
     r"""
         Two choices for loss function:
             1. nn.BCELoss  (loss_1) （suggest）
@@ -51,6 +51,7 @@ class REL_MF(DebiasedRecommender):
         self.global_bias = nn.Parameter(torch.zeros(1))
 
         self.propensity_score, self.column = dataset.estimate_pscore()
+        self.propensity_score = self.propensity_score.to(self.device)
 
         # parameters initializationBCE
         self.apply(xavier_normal_initialization)

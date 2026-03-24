@@ -256,12 +256,12 @@ class Trainer(AbstractTrainer):
                 total_loss = (
                     losses.item() if total_loss is None else total_loss + losses.item()
                 )
-            self._check_nan(loss)
-            scaler.scale(loss).backward()
-            if self.clip_grad_norm:
-                clip_grad_norm_(self.model.parameters(), **self.clip_grad_norm)
-            scaler.step(self.optimizer)
-            scaler.update()
+            # self._check_nan(loss)
+            # # scaler.scale(loss).backward()
+            # if self.clip_grad_norm:
+            #     clip_grad_norm_(self.model.parameters(), **self.clip_grad_norm)
+            # # scaler.step(self.optimizer)
+            # scaler.update()
             if self.gpu_available and show_progress:
                 iter_data.set_postfix_str(
                     set_color("GPU RAM: " + get_gpu_usage(self.device), "yellow")
@@ -438,13 +438,61 @@ class Trainer(AbstractTrainer):
         if self.config["equalize_attention"]:
             self.protected_map = train_data.dataset.protected_map
 
+        if True: # TODO replace wit an actual condition
+            self.avg_rating = train_data.dataset.avg_rating
+
         if self.config["train_neg_sample_args"].get("dynamic", False):
             train_data.get_model(self.get_model())
         valid_step = 0
 
+        for pretrain_idx in range(self.start_epoch, 10):
+            training_start_time = time()
+            train_loss = self._train_epoch(train_data, pretrain_idx, show_progress=show_progress)
+            
+            training_end_time = time()
+            train_loss_output = self._generate_train_loss_output(
+                pretrain_idx, training_start_time, training_end_time, train_loss
+            )
+            if verbose:
+                self.logger.info(train_loss_output)
+
+        valid_start_time = time()
+        valid_score, valid_result = self._valid_epoch(
+            valid_data, show_progress=show_progress
+        )
+
+        (
+            self.best_valid_score,
+            self.cur_step,
+            stop_flag,
+            update_flag,
+        ) = early_stopping(
+            valid_score,
+            self.best_valid_score,
+            self.cur_step,
+            max_step=self.stopping_step,
+            bigger=self.valid_metric_bigger,
+        )
+        valid_end_time = time()
+        valid_score_output = (
+            set_color("epoch %d evaluating", "green")
+            + " ["
+            + set_color("time", "blue")
+            + ": %.2fs, "
+            + set_color("valid_score", "blue")
+            + ": %f]"
+        ) % (9, valid_end_time - valid_start_time, valid_score)
+        valid_result_output = (
+            set_color("valid result", "blue") + ": \n" + dict2str(valid_result)
+        )
+        if verbose:
+            self.logger.info(valid_score_output)
+            self.logger.info(valid_result_output)
+
+        self.model.is_pretrained = True
+
         for epoch_idx in range(self.start_epoch, self.epochs):
             # train
-            training_start_time = time()
             train_loss = self._train_epoch(
                 train_data, epoch_idx, show_progress=show_progress
             )
@@ -569,7 +617,7 @@ class Trainer(AbstractTrainer):
 
     @torch.no_grad()
     def evaluate(
-        self, eval_data, load_best_model=True, model_file=None, show_progress=False
+        self, eval_data, load_best_model=False, model_file=None, show_progress=False
     ):
         r"""Evaluate the model based on the eval data.
 
@@ -1685,6 +1733,13 @@ class FairGoTrainer(Trainer):
         self.model.train_stage = 'finetune'
 
     def fit(self, train_data, valid_data=None, verbose=True, saved=True, show_progress=False, callback_fn=None):
+        if self.model.train_stage == 'pretrain':
+            self.pretrain(train_data, valid_data, verbose, saved, show_progress)
+            self.reset_params()
+            return super().fit(train_data, valid_data, verbose, saved, show_progress, callback_fn)
+        elif self.model.train_stage == 'finetune':
+            return super().fit(train_data, valid_data, verbose, saved, show_progress, callback_fn)
+        else:
             raise ValueError("Please make sure that the 'train_stage' is 'pretrain' or 'finetune'!")
 
     def save_pretrained_model(self, saved_model_file):
@@ -1773,7 +1828,7 @@ class FairGoTrainer(Trainer):
 
                 valid_step += 1
 
-        checkpoint = torch.load(self.saved_pretrain_model_file)
+        checkpoint = torch.load(self.saved_pretrain_model_file, weights_only=False)
         self.model.load_state_dict(checkpoint['state_dict'])
         self.model.load_other_parameter(checkpoint.get('other_parameter'))
         # store embedding and sst if task need attacker after training

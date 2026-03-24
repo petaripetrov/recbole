@@ -23,13 +23,13 @@ import numpy as np
 import scipy.sparse as sp
 import torch
 
-from recbole.model.abstract_recommender import DebiasedRecommender
+from recbole.model.abstract_recommender import IPSRecommender
 from recbole.model.init import xavier_uniform_initialization
 from recbole.model.loss import BPRLoss, EmbLoss
 from recbole.utils import InputType
 
 
-class LightGCN(DebiasedRecommender):
+class LightGCN(IPSRecommender):
     r"""LightGCN is a GCN-based recommender model.
 
     LightGCN includes only the most essential component in GCN — neighborhood aggregation — for

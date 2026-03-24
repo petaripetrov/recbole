@@ -2409,6 +2409,11 @@ class Dataset(torch.utils.data.Dataset):
         self.tail_set = self._calc_tail_set()
         self.head_set = self._calc_head_set()
 
+        #Taken directly from https://github.com/mediumboat/FAiR/blob/7848a0c63730128f234a2fd894de97805556b4f8/dataloader.py#L54
+        avg_rating = pd.DataFrame(self.inter_feat.groupby('item_id')['rating'].mean())
+        avg_rating = avg_rating['rating'].values
+
+        self.avg_rating = avg_rating
         # Not used anymore
         if self.build_protected_map:
             protected_map = torch.zeros(self.item_num, dtype=torch.int64)

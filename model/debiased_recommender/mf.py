@@ -13,12 +13,12 @@ Reference:
 import torch
 import torch.nn as nn
 
-from recbole.model.abstract_recommender import DebiasedRecommender
+from recbole.model.abstract_recommender import IPSRecommender
 from recbole.model.init import xavier_normal_initialization
 from recbole.utils import InputType
 
 
-class MF(DebiasedRecommender):
+class MF(IPSRecommender):
     r"""
     Inverse Propensity Score based on MF model.
     We simply implemented three methods (in recbole-debias.data.dataset) to calculate Propensity Score:

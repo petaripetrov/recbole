@@ -15,10 +15,10 @@ import torch.nn as nn
 
 from recbole.model.init import xavier_normal_initialization
 from recbole.utils import InputType
-from recbole.model.abstract_recommender import DebiasedRecommender
+from recbole.model.abstract_recommender import IPSRecommender
 
 
-class DICE(DebiasedRecommender):
+class DICE(IPSRecommender):
     r"""
         DICE model, which equipped with DICESampler(in recbole-debias.sampler) and DICETrainer(in recbole-debias.trainer)
     """
