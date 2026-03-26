@@ -2488,9 +2488,9 @@ class FAiRTrainer(Trainer):
             train_data.get_model(self.get_model())
         valid_step = 0
         
-        # for pretrain_idx in range(self.start_epoch, self.pretrain_epochs):
-            # self._run_pretrain(train_data, pretrain_idx, verbose, show_progress)
-            # self._run_valid(valid_data, verbose, show_progress)
+        for pretrain_idx in range(self.start_epoch, self.pretrain_epochs):
+            self._run_pretrain(train_data, pretrain_idx, verbose, show_progress)
+            self._run_valid(valid_data, verbose, show_progress)
             
         self.model.is_pretrained = True
             

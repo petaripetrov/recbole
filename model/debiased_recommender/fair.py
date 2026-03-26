@@ -183,9 +183,9 @@ class FAiR(AbstractRecommender):
         item_group = torch.zeros(self.n_items)
         # avg_rating_df = pd.DataFrame(df.groupby('item')['rating'].mean())
         avg_rating = dataset.avg_rating
-        self.register_buffer('user_group', torch.tensor(user_group.clone().detach().long().squeeze(), dtype=torch.int64).squeeze())
-        self.register_buffer('item_group', torch.tensor(item_group.clone().detach().long().squeeze(), dtype=torch.int64).squeeze())
-        self.register_buffer('average_rating', torch.tensor(avg_rating.clone().detach().long().squeeze(), dtype=torch.int64).squeeze())
+        self.register_buffer('user_group', user_group.detach().clone().long().squeeze())
+        self.register_buffer('item_group', item_group.detach().clone().long().squeeze())
+        self.register_buffer('average_rating', torch.tensor(avg_rating, dtype=torch.float32).squeeze())
 
         self.user_embedding_layer = nn.Embedding(self.n_users, dimension)
         self.item_embedding_layer = nn.Embedding(self.n_items, dimension)
@@ -283,13 +283,14 @@ class FAiR(AbstractRecommender):
         # In the TF original these are computed before the d_step loop,
         # outside the GradientTape, so gradients do not flow through them
         sampled_user_ids = torch.randint(0, self.n_users, (self.n_user_samples,), device=device)
-        sampled_item_ids = torch.randint(0, self.n_items, (self.n_item_samples,), device=device)
+        sampled_item_ids = torch.randint(0, self.n_items - 1, (self.n_item_samples,), device=device)
         sampled_users = sampled_user_ids.repeat_interleave(self.n_item_samples)
         sampled_items = sampled_item_ids.repeat(self.n_user_samples)
 
         with torch.no_grad():
             ru_vectors = self.forward(sampled_users, sampled_items, training=False)
             ru_vectors = ru_vectors.reshape(self.n_user_samples, self.n_item_samples)
+            t = sampled_item_ids.max()
             ro_vectors = self.average_rating[sampled_item_ids].reshape(1, self.n_item_samples)
 
         ru_labels = torch.zeros(self.n_user_samples, device=device)
