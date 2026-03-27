@@ -2377,7 +2377,7 @@ class FAiRTrainer(Trainer):
             self.optimizer.zero_grad()
 
             with torch.autocast(device_type=self.device.type, enabled=self.enable_amp):
-                losses = loss_func(interaction, scaler)
+                losses = loss_func(interaction)
 
             if isinstance(losses, tuple):
                 loss = sum(losses)
@@ -2490,9 +2490,9 @@ class FAiRTrainer(Trainer):
             train_data.get_model(self.get_model())
         valid_step = 0
         
-        for pretrain_idx in range(self.start_epoch, self.pretrain_epochs):
-            self._run_pretrain(train_data, pretrain_idx, verbose, show_progress)
-            self._run_valid(valid_data, verbose, show_progress)
+        # for pretrain_idx in range(self.start_epoch, self.pretrain_epochs):
+        #     self._run_pretrain(train_data, pretrain_idx, verbose, show_progress)
+        #     self._run_valid(valid_data, verbose, show_progress)
             
         self.model.is_pretrained = True
             
