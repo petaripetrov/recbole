@@ -199,7 +199,7 @@ class Trainer(AbstractTrainer):
             optimizer = optim.Adam(params, lr=learning_rate)
         return optimizer
 
-    def _train_epoch(self, train_data, epoch_idx, loss_func=None, show_progress=False):
+    def _train_epoch(self, train_data, epoch_idx, loss_func=None, show_progress=False, label="Train"):
         r"""Train the model in an epoch
 
         Args:
@@ -222,7 +222,7 @@ class Trainer(AbstractTrainer):
                 train_data,
                 total=len(train_data),
                 ncols=100,
-                desc=set_color(f"Train {epoch_idx:>5}", "pink"),
+                desc=set_color(f"{label} {epoch_idx:>5}", "pink"),
             )
             if show_progress
             else train_data
@@ -2401,7 +2401,7 @@ class FAiRTrainer(Trainer):
         """
         start = time()
         
-        loss = self._train_epoch(train_data, idx, show_progress=show_progress)
+        loss = self._train_epoch(train_data, idx, show_progress=show_progress, label="Pretrain")
         
         end = time()
         
@@ -2418,18 +2418,6 @@ class FAiRTrainer(Trainer):
             data, show_progress=show_progress
         )
 
-        (
-            self.best_valid_score,
-            self.cur_step,
-            stop_flag,
-            update_flag,
-        ) = early_stopping(
-            valid_score,
-            self.best_valid_score,
-            self.cur_step,
-            max_step=self.stopping_step,
-            bigger=self.valid_metric_bigger,
-        )
         valid_end_time = time()
         valid_score_output = (
             set_color("epoch %d evaluating", "green")
