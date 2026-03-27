@@ -257,11 +257,11 @@ class Trainer(AbstractTrainer):
                     losses.item() if total_loss is None else total_loss + losses.item()
                 )
             self._check_nan(loss)
-            # scaler.scale(loss).backward()
-            # if self.clip_grad_norm:
-            #     clip_grad_norm_(self.model.parameters(), **self.clip_grad_norm)
-            # scaler.step(self.optimizer)
-            # scaler.update()
+            scaler.scale(loss).backward()
+            if self.clip_grad_norm:
+                clip_grad_norm_(self.model.parameters(), **self.clip_grad_norm)
+            scaler.step(self.optimizer)
+            scaler.update()
             if self.gpu_available and show_progress:
                 iter_data.set_postfix_str(
                     set_color("GPU RAM: " + get_gpu_usage(self.device), "yellow")
@@ -2351,6 +2351,54 @@ class FAiRTrainer(Trainer):
         
         self.pretrain_epochs = 10
         
+    def _train_epoch(self, train_data, epoch_idx, loss_func=None, show_progress=False):
+        self.model.train()
+        loss_func = loss_func or self.get_model().calculate_loss
+        total_loss = None
+        
+        iter_data = (
+            tqdm(
+                train_data,
+                total=len(train_data),
+                ncols=100,
+                desc=set_color(f"Train {epoch_idx:>5}", "pink")
+            )
+            if show_progress
+            else train_data
+        )
+        
+        if not self.config["single_spec"] and train_data.shuffle:
+            train_data.sampler.set_epoch(epoch_idx)
+            
+        scaler = amp.GradScaler(enabled=self.enable_scaler)
+        for batch_idx, interaction in enumerate(iter_data):
+            interaction = interaction.to(self.device)
+            
+            self.optimizer.zero_grad()
+
+            with torch.autocast(device_type=self.device.type, enabled=self.enable_amp):
+                losses = loss_func(interaction, scaler)
+
+            if isinstance(losses, tuple):
+                loss = sum(losses)
+                loss_tuple = tuple(per_loss.item() for per_loss in losses)
+                total_loss = (
+                    loss_tuple
+                    if total_loss is None
+                    else tuple(map(sum, zip(total_loss, loss_tuple)))
+                )
+            else:
+                loss = losses
+                total_loss = (
+                    losses.item() if total_loss is None else total_loss + losses.item()
+                )
+                
+            if self.gpu_available and show_progress:
+                iter_data.set_postfix_str(
+                    set_color("GPU RAM: " + get_gpu_usage(self.device), "yellow")
+                )
+        return total_loss
+    
     def _run_pretrain(self, train_data, idx, verbose, show_progress):
         r"""Run pretraining step
         """
@@ -2400,8 +2448,7 @@ class FAiRTrainer(Trainer):
         if verbose:
             self.logger.info(valid_score_output)
             self.logger.info(valid_result_output)
-            
-        
+      
     def fit(
         self,
         train_data,
