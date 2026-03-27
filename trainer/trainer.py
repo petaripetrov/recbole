@@ -256,11 +256,11 @@ class Trainer(AbstractTrainer):
                 total_loss = (
                     losses.item() if total_loss is None else total_loss + losses.item()
                 )
-            # self._check_nan(loss)
-            # # scaler.scale(loss).backward()
+            self._check_nan(loss)
+            # scaler.scale(loss).backward()
             # if self.clip_grad_norm:
             #     clip_grad_norm_(self.model.parameters(), **self.clip_grad_norm)
-            # # scaler.step(self.optimizer)
+            # scaler.step(self.optimizer)
             # scaler.update()
             if self.gpu_available and show_progress:
                 iter_data.set_postfix_str(
@@ -445,54 +445,9 @@ class Trainer(AbstractTrainer):
             train_data.get_model(self.get_model())
         valid_step = 0
 
-        for pretrain_idx in range(self.start_epoch, 10):
-            training_start_time = time()
-            train_loss = self._train_epoch(train_data, pretrain_idx, show_progress=show_progress)
-            
-            training_end_time = time()
-            train_loss_output = self._generate_train_loss_output(
-                pretrain_idx, training_start_time, training_end_time, train_loss
-            )
-            if verbose:
-                self.logger.info(train_loss_output)
-
-        valid_start_time = time()
-        valid_score, valid_result = self._valid_epoch(
-            valid_data, show_progress=show_progress
-        )
-
-        (
-            self.best_valid_score,
-            self.cur_step,
-            stop_flag,
-            update_flag,
-        ) = early_stopping(
-            valid_score,
-            self.best_valid_score,
-            self.cur_step,
-            max_step=self.stopping_step,
-            bigger=self.valid_metric_bigger,
-        )
-        valid_end_time = time()
-        valid_score_output = (
-            set_color("epoch %d evaluating", "green")
-            + " ["
-            + set_color("time", "blue")
-            + ": %.2fs, "
-            + set_color("valid_score", "blue")
-            + ": %f]"
-        ) % (9, valid_end_time - valid_start_time, valid_score)
-        valid_result_output = (
-            set_color("valid result", "blue") + ": \n" + dict2str(valid_result)
-        )
-        if verbose:
-            self.logger.info(valid_score_output)
-            self.logger.info(valid_result_output)
-
-        self.model.is_pretrained = True
-
         for epoch_idx in range(self.start_epoch, self.epochs):
             # train
+            training_start_time = time()
             train_loss = self._train_epoch(
                 train_data, epoch_idx, show_progress=show_progress
             )
