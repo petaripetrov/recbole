@@ -2370,7 +2370,6 @@ class FAiRTrainer(Trainer):
         if not self.config["single_spec"] and train_data.shuffle:
             train_data.sampler.set_epoch(epoch_idx)
             
-        scaler = amp.GradScaler(enabled=self.enable_scaler)
         for batch_idx, interaction in enumerate(iter_data):
             interaction = interaction.to(self.device)
             
