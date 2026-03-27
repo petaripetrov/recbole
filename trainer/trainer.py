@@ -256,12 +256,12 @@ class Trainer(AbstractTrainer):
                 total_loss = (
                     losses.item() if total_loss is None else total_loss + losses.item()
                 )
-            # self._check_nan(loss)
-            # # scaler.scale(loss).backward()
-            # if self.clip_grad_norm:
-            #     clip_grad_norm_(self.model.parameters(), **self.clip_grad_norm)
-            # # scaler.step(self.optimizer)
-            # scaler.update()
+            self._check_nan(loss)
+            scaler.scale(loss).backward()
+            if self.clip_grad_norm:
+                clip_grad_norm_(self.model.parameters(), **self.clip_grad_norm)
+            scaler.step(self.optimizer)
+            scaler.update()
             if self.gpu_available and show_progress:
                 iter_data.set_postfix_str(
                     set_color("GPU RAM: " + get_gpu_usage(self.device), "yellow")
@@ -445,54 +445,9 @@ class Trainer(AbstractTrainer):
             train_data.get_model(self.get_model())
         valid_step = 0
 
-        for pretrain_idx in range(self.start_epoch, 10):
-            training_start_time = time()
-            train_loss = self._train_epoch(train_data, pretrain_idx, show_progress=show_progress)
-            
-            training_end_time = time()
-            train_loss_output = self._generate_train_loss_output(
-                pretrain_idx, training_start_time, training_end_time, train_loss
-            )
-            if verbose:
-                self.logger.info(train_loss_output)
-
-        valid_start_time = time()
-        valid_score, valid_result = self._valid_epoch(
-            valid_data, show_progress=show_progress
-        )
-
-        (
-            self.best_valid_score,
-            self.cur_step,
-            stop_flag,
-            update_flag,
-        ) = early_stopping(
-            valid_score,
-            self.best_valid_score,
-            self.cur_step,
-            max_step=self.stopping_step,
-            bigger=self.valid_metric_bigger,
-        )
-        valid_end_time = time()
-        valid_score_output = (
-            set_color("epoch %d evaluating", "green")
-            + " ["
-            + set_color("time", "blue")
-            + ": %.2fs, "
-            + set_color("valid_score", "blue")
-            + ": %f]"
-        ) % (9, valid_end_time - valid_start_time, valid_score)
-        valid_result_output = (
-            set_color("valid result", "blue") + ": \n" + dict2str(valid_result)
-        )
-        if verbose:
-            self.logger.info(valid_score_output)
-            self.logger.info(valid_result_output)
-
-        self.model.is_pretrained = True
-
         for epoch_idx in range(self.start_epoch, self.epochs):
             # train
+            training_start_time = time()
             train_loss = self._train_epoch(
                 train_data, epoch_idx, show_progress=show_progress
             )
@@ -2396,6 +2351,53 @@ class FAiRTrainer(Trainer):
         
         self.pretrain_epochs = 10
         
+    def _train_epoch(self, train_data, epoch_idx, loss_func=None, show_progress=False):
+        self.model.train()
+        loss_func = loss_func or self.get_model().calculate_loss
+        total_loss = None
+        
+        iter_data = (
+            tqdm(
+                train_data,
+                total=len(train_data),
+                ncols=100,
+                desc=set_color(f"Train {epoch_idx:>5}", "pink")
+            )
+            if show_progress
+            else train_data
+        )
+        
+        if not self.config["single_spec"] and train_data.shuffle:
+            train_data.sampler.set_epoch(epoch_idx)
+            
+        for batch_idx, interaction in enumerate(iter_data):
+            interaction = interaction.to(self.device)
+            
+            self.optimizer.zero_grad()
+
+            with torch.autocast(device_type=self.device.type, enabled=self.enable_amp):
+                losses = loss_func(interaction)
+
+            if isinstance(losses, tuple):
+                loss = sum(losses)
+                loss_tuple = tuple(per_loss.item() for per_loss in losses)
+                total_loss = (
+                    loss_tuple
+                    if total_loss is None
+                    else tuple(map(sum, zip(total_loss, loss_tuple)))
+                )
+            else:
+                loss = losses
+                total_loss = (
+                    losses.item() if total_loss is None else total_loss + losses.item()
+                )
+                
+            if self.gpu_available and show_progress:
+                iter_data.set_postfix_str(
+                    set_color("GPU RAM: " + get_gpu_usage(self.device), "yellow")
+                )
+        return total_loss
+    
     def _run_pretrain(self, train_data, idx, verbose, show_progress):
         r"""Run pretraining step
         """
@@ -2433,8 +2435,7 @@ class FAiRTrainer(Trainer):
         if verbose:
             self.logger.info(valid_score_output)
             self.logger.info(valid_result_output)
-            
-        
+      
     def fit(
         self,
         train_data,
@@ -2476,9 +2477,9 @@ class FAiRTrainer(Trainer):
             train_data.get_model(self.get_model())
         valid_step = 0
         
-        for pretrain_idx in range(self.start_epoch, self.pretrain_epochs):
-            self._run_pretrain(train_data, pretrain_idx, verbose, show_progress)
-            self._run_valid(valid_data, verbose, show_progress)
+        # for pretrain_idx in range(self.start_epoch, self.pretrain_epochs):
+        #     self._run_pretrain(train_data, pretrain_idx, verbose, show_progress)
+        #     self._run_valid(valid_data, verbose, show_progress)
             
         self.model.is_pretrained = True
             

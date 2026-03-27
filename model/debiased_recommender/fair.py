@@ -260,7 +260,6 @@ class FAiR(AbstractRecommender):
 
         loss.backward()
         self.pretrain_optimizer.step()
-
         return loss
     
     def _adv_train(self, user, item, y_true):
