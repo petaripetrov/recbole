@@ -65,12 +65,12 @@ class _BPR(GeneralRecommender):
         """
         return self.item_embedding(item)
 
-    def forward(self, user, item):
+    def forward(self, user, item) -> tuple[torch.Tensor, torch.Tensor]:
         user_e = self.get_user_embedding(user)
         item_e = self.get_item_embedding(item)
         return user_e, item_e
 
-    def calculate_loss(self, interaction):
+    def _calculate_loss(self, interaction):
         user = interaction[self.USER_ID]
         pos_item = interaction[self.ITEM_ID]
         neg_item = interaction[self.NEG_ITEM_ID]

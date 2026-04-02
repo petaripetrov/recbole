@@ -19,15 +19,16 @@ import torch
 import torch.nn as nn
 
 from recbole.data.interaction import Interaction
+from recbole.model.init import xavier_normal_initialization
 from recbole.model.layers import FLEmbedding, FMEmbedding, FMFirstOrderLinear
-from recbole.model.loss import EmbLoss
+from recbole.model.loss import BPRLoss, EmbLoss
 from recbole.utils import FeatureSource, FeatureType, InputType, ModelType, set_color
 
 
 class AbstractRecommender(nn.Module):
     r"""Base class for all models"""
 
-    def __init__(self):
+    def __init__(self, config, dataset):
         self.logger = getLogger()
         super(AbstractRecommender, self).__init__()
 
@@ -98,7 +99,7 @@ class GeneralRecommender(AbstractRecommender):
     type = ModelType.GENERAL
 
     def __init__(self, config, dataset):
-        super(GeneralRecommender, self).__init__()
+        super(GeneralRecommender, self).__init__(config, dataset)
 
         # load dataset info
         self.USER_ID = config["USER_ID_FIELD"]
@@ -634,7 +635,7 @@ class IPSRecommender(AbstractRecommender):
     type = ModelType.GENERAL
 
     def __init__(self, config, dataset, state_dict=None):
-        super(IPSRecommender, self).__init__()
+        super().__init__(config, dataset)
         
         # load dataset info
         self.USER_ID = config["USER_ID_FIELD"]
@@ -671,6 +672,43 @@ class IPSRecommender(AbstractRecommender):
             )
 
         return loss
+
+class PDARecommender(AbstractRecommender):
+    type = ModelType.GENERAL
+
+    def __init__(self, config, dataset):
+        super().__init__(config, dataset)
+
+        self.USER_ID = config["USER_ID_FIELD"]
+        self.ITEM_ID = config["ITEM_ID_FIELD"]
+        self.PROPENSITIES = config["PROPENSITY_FIELD"]
+        self.NEG_ITEM_ID = config["NEG_PREFIX"] + self.ITEM_ID
+        self.n_users = dataset.num(self.USER_ID)
+        self.n_items = dataset.num(self.ITEM_ID)
+        self.device = config["device"]
+        self.reg_weight = config['reg_weight']
+        self.predict_method = config['predict_method']
+        self.eta = config['eta']
+
+        propensity_score, self.column = dataset.estimate_pscore()
+        self.propensity_score = propensity_score.to(self.device)
+
+        # PDA mandatory
+        self.loss = BPRLoss()
+        self.reg_loss = EmbLoss()
+        self.elu = nn.ELU()
+
+        # self.apply(xavier_normal_initialization)
+    
+    def predict(self, interaction):
+        user = interaction[self.USER_ID]
+        item = interaction[self.ITEM_ID]
+        user_e, item_e = self.forward(user, item)
+        score = self.elu(torch.mul(user_e, item_e).sum(dim=1)) + 1  # [batch,dim] -> [batch]
+        if self.predict_method == 'PDA':
+            item_weight = self.propensity_score[item].to(self.device)
+            score = score * item_weight
+        return score
 
 
 class FairRecommender(AbstractRecommender):
