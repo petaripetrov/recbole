@@ -42,7 +42,6 @@ class PDA(IPSRecommender):
         self.loss = BPRLoss()
         self.reg_loss = EmbLoss()
         self.elu = nn.ELU()
-        self.propensity_score, self.column = dataset.estimate_pscore()
 
         self.propensity_score = self.propensity_score.to(self.device)
 

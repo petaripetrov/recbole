@@ -20,7 +20,7 @@ import torch.nn as nn
 
 from recbole.data.interaction import Interaction
 from recbole.model.init import xavier_normal_initialization
-from recbole.model.layers import FLEmbedding, FMEmbedding, FMFirstOrderLinear
+from recbole.model.layers import FLEmbedding, FMEmbedding, FMFirstOrderLinear, MLPLayers
 from recbole.model.loss import BPRLoss, EmbLoss
 from recbole.utils import FeatureSource, FeatureType, InputType, ModelType, set_color
 
@@ -709,6 +709,87 @@ class PDARecommender(AbstractRecommender):
             item_weight = self.propensity_score[item].to(self.device)
             score = score * item_weight
         return score
+
+class MACRRecommender(AbstractRecommender):
+    def __init__(self, config, dataset):
+        super().__init__(config, dataset)
+
+        # self.LABEL = config['LABEL_FIELD']
+        self.USER_ID = config["USER_ID_FIELD"]
+        self.ITEM_ID = config["ITEM_ID_FIELD"]
+        self.PROPENSITIES = config["PROPENSITY_FIELD"]
+        self.NEG_ITEM_ID = config["NEG_PREFIX"] + self.ITEM_ID
+
+        # load parameters info
+        self.embedding_size = config['embedding_size']
+        self.mlp_hidden_size = config['mlp_hidden_size']
+        self.dropout_prob = config['dropout_prob']
+        self.item_loss_weight = config['item_loss_weight']
+        self.user_loss_weight = config['user_loss_weight']
+        self.c = config['c']
+
+        # MACR specific layers
+        size_list = [self.embedding_size] + self.mlp_hidden_size
+        self.user_module = MLPLayers(size_list, self.dropout_prob)
+        self.item_module = MLPLayers(size_list, self.dropout_prob)
+
+        self.module_loss = nn.BCEWithLogitsLoss()
+        self.sigmoid = nn.Sigmoid()
+
+    def get_user_embedding(self, user):
+        raise NotImplementedError
+    
+    def get_item_embedding(self, item):
+        raise NotImplementedError
+    
+    # def _forward(self, user, item) -> tuple[torch.Tensor, torch.Tensor]:
+    #     raise NotImplementedError
+
+    def forward(self, user, item):
+        user_e, item_e = self._forward(user, item)
+
+        user_e = user_e[user]
+        item_e = item_e[item]
+
+        yk = torch.mul(user_e, item_e).sum(dim=1)
+        yu = self.sigmoid(self.user_module(user_e)).squeeze(-1)
+        yi = self.sigmoid(self.item_module(item_e)).squeeze(-1)
+        yui = self.sigmoid(yk * yu * yi)
+
+        return yk, yui, yu, yi
+    
+    # def calculate_loss(self, interaction):
+    #     user = interaction[self.USER_ID]
+    #     item = interaction[self.ITEM_ID]
+    #     neg_item = interaction[self.LABEL]
+
+    #     yk, yui, yu, yi = self.forward(user, item)
+    #     loss_o = self.loss(yui, label)
+    #     loss_i = self.loss(yi, label)
+    #     loss_u = self.loss(yu, label)
+
+    #     loss = loss_o + self.item_loss_weight * loss_i + self.user_loss_weight * loss_u
+
+    #     return loss
+    
+    def predict(self, interaction):
+        user = interaction[self.USER_ID]
+        item = interaction[self.ITEM_ID]
+        yk, _, yu, yi = self.forward(user, item)
+        score = (yk - self.c) * yu * yi
+        return score
+
+    def full_sort_predict(self, interaction):
+        user = interaction[self.USER_ID]
+        user_e = self.get_user_embedding(user)
+        all_item_e = self.item_embedding.weight
+
+        yu = self.sigmoid(self.user_module(user_e))  # [user_num,1]
+        yi = self.sigmoid(self.item_module(all_item_e)).squeeze(-1)  # [item_num]
+        yk = torch.matmul(user_e, all_item_e.transpose(0, 1))  # [user_num,item_num]
+        score = (yk - self.c) * yu * yi
+        return score.view(-1)
+
 
 
 class FairRecommender(AbstractRecommender):

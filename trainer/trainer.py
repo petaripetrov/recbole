@@ -24,7 +24,7 @@ from time import time
 
 import numpy as np
 import torch
-import torch.cuda.amp as amp
+import torch.amp as amp
 import torch.nn.functional as F
 import torch.optim as optim
 from torch.nn.parallel import DistributedDataParallel

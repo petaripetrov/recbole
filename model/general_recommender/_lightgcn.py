@@ -139,7 +139,7 @@ class _LightGCN(GeneralRecommender):
         ego_embeddings = torch.cat([user_embeddings, item_embeddings], dim=0)
         return ego_embeddings
 
-    def forward(self):
+    def _forward(self, user, item):
         all_embeddings = self.get_ego_embeddings()
         embeddings_list = [all_embeddings]
 
