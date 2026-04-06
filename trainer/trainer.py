@@ -303,7 +303,7 @@ class Trainer(AbstractTrainer):
             "best_valid_score": self.best_valid_score,
             "state_dict": self.model.state_dict(),
             "other_parameter": self.get_model().other_parameter(),
-            "optimizer": self.optimizer.state_dict(),
+            # "optimizer": self.optimizer.state_dict(),
         }
         torch.save(state, saved_model_file, pickle_protocol=4)
         if verbose:
@@ -438,6 +438,9 @@ class Trainer(AbstractTrainer):
         if self.config["equalize_attention"]:
             self.protected_map = train_data.dataset.protected_map
 
+        self.item_pop = train_data.dataset.item_pop
+        self.train_mask = train_data.dataset.mask
+
         if True: # TODO replace wit an actual condition
             self.avg_rating = train_data.dataset.avg_rating
 
@@ -546,9 +549,17 @@ class Trainer(AbstractTrainer):
                 scores = self._spilt_predict(new_inter, batch_size)
 
         scores = scores.view(-1, self.tot_item_num)
+        
+        # TODO try equalized attention here too this way
+        train_mask = self.train_mask[interaction["user_id"]].to(scores.device)
+        train_mask[:, 0] = True
+        
+        scores = self.popularity_compensation(scores, self.item_pop.to(scores.device), train_mask)
+        
         scores[:, 0] = -np.inf
         if history_index is not None:
             scores[history_index] = -np.inf
+
         return interaction, scores, positive_u, positive_i
 
     def _neg_sample_batch_eval(self, batched_data):
@@ -633,8 +644,11 @@ class Trainer(AbstractTrainer):
                     set_color("GPU RAM: " + get_gpu_usage(self.device), "yellow")
                 )
 
-            if self.config["equalize_attention"]:
-                scores = self.equalize_attention(scores, self.protected_map, len(self.protected_map.unique()))
+            # if True: # hardcoded for now
+            #     item_pop = torch.Tensor(self.item_pop).to(scores.device)
+            #     train_mask = self.train_mask[batched_data[0]["user_id"]].to(scores.device)
+            #     new_scores = self.popularity_compensation(scores, item_pop, train_mask) 
+            #     scores = new_scores
 
             self.eval_collector.eval_batch_collect(
                 scores, interaction, positive_u, positive_i
@@ -678,6 +692,33 @@ class Trainer(AbstractTrainer):
         corrected_scores = scores + item_bias.unsqueeze(0)
 
         return corrected_scores
+    
+    @torch.no_grad()
+    def popularity_compensation(self, scores, item_popularity, train_mask, alpha=1.0, beta=0.5):
+        scores = torch.where(torch.isinf(scores), torch.full_like(scores, -1e9), scores)
+        # User norm (n_u)
+        uninteract = ~train_mask
+        uninteract_scores = scores * uninteract.float()
+        
+        # n_u = ||scores_uninteracted||_2 / (M - |O_u+|)
+        f_norm = torch.norm(uninteract_scores, p=2, dim=1)
+
+        # Count of uninteracted items (M - |O_u+|)
+        # M is scores.shape[1], |O_u+| is train_mask.sum(dim=1)
+        num_uninteracted = uninteract.sum(dim=1).float()
+
+        n_u = f_norm / torch.clamp(num_uninteracted, min=1.0)
+
+        inv_pop = 1.0 / torch.clamp(item_popularity.float(), min=1.0)
+        # compensation score (C_ui)
+        # C_ui = (1 / pop_i) * (R_ui * beta + 1 - beta)
+
+        c_ui = inv_pop * (scores * beta + (1 - beta))
+
+        # R_tilde = R_ui + alpha * n_u * C_ui
+        adjusted_scores = scores + alpha * n_u.unsqueeze(1) * c_ui
+
+        return adjusted_scores
 
     def _map_reduce(self, result, num_sample):
         gather_result = {}
@@ -2350,8 +2391,9 @@ class FAiRTrainer(Trainer):
         super(FAiRTrainer, self).__init__(config, model)
         
         self.pretrain_epochs = 10
+        self.optimizer = None
         
-    def _train_epoch(self, train_data, epoch_idx, loss_func=None, show_progress=False):
+    def _train_epoch(self, train_data, epoch_idx, loss_func=None, show_progress=False, label="Train"):
         self.model.train()
         loss_func = loss_func or self.get_model().calculate_loss
         total_loss = None
@@ -2361,7 +2403,7 @@ class FAiRTrainer(Trainer):
                 train_data,
                 total=len(train_data),
                 ncols=100,
-                desc=set_color(f"Train {epoch_idx:>5}", "pink")
+                desc=set_color(f"{label} {epoch_idx:>5}", "pink")
             )
             if show_progress
             else train_data
@@ -2373,8 +2415,6 @@ class FAiRTrainer(Trainer):
         for batch_idx, interaction in enumerate(iter_data):
             interaction = interaction.to(self.device)
             
-            self.optimizer.zero_grad()
-
             with torch.autocast(device_type=self.device.type, enabled=self.enable_amp):
                 losses = loss_func(interaction)
 
@@ -2477,9 +2517,9 @@ class FAiRTrainer(Trainer):
             train_data.get_model(self.get_model())
         valid_step = 0
         
-        # for pretrain_idx in range(self.start_epoch, self.pretrain_epochs):
-        #     self._run_pretrain(train_data, pretrain_idx, verbose, show_progress)
-        #     self._run_valid(valid_data, verbose, show_progress)
+        for pretrain_idx in range(self.start_epoch, self.pretrain_epochs):
+            self._run_pretrain(train_data, pretrain_idx, verbose, show_progress)
+            self._run_valid(valid_data, verbose, show_progress)
             
         self.model.is_pretrained = True
             
