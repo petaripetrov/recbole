@@ -623,10 +623,6 @@ class ContextRecommender(AbstractRecommender):
 # @Author : Jingsen Zhang
 # @Email  : zhangjingsen@ruc.edu.cn
 
-from recbole.model.abstract_recommender import AbstractRecommender
-from recbole.utils import ModelType
-
-
 class IPSRecommender(AbstractRecommender):
     """This is a abstract general recommender. All the general model should implement this class.
     The base general recommender class provide the basic dataset and parameters information.
@@ -694,21 +690,21 @@ class PDARecommender(AbstractRecommender):
         self.propensity_score = propensity_score.to(self.device)
 
         # PDA mandatory
-        self.loss = BPRLoss()
+        # self.loss = BPRLoss()
         self.reg_loss = EmbLoss()
         self.elu = nn.ELU()
 
         # self.apply(xavier_normal_initialization)
     
-    def predict(self, interaction):
-        user = interaction[self.USER_ID]
-        item = interaction[self.ITEM_ID]
-        user_e, item_e = self.forward(user, item)
-        score = self.elu(torch.mul(user_e, item_e).sum(dim=1)) + 1  # [batch,dim] -> [batch]
-        if self.predict_method == 'PDA':
-            item_weight = self.propensity_score[item].to(self.device)
-            score = score * item_weight
-        return score
+    # def predict(self, interaction):
+    #     user = interaction[self.USER_ID]
+    #     item = interaction[self.ITEM_ID]
+    #     user_e, item_e = self.forward(user, item)
+    #     score = self.elu(torch.mul(user_e, item_e).sum(dim=1)) + 1  # [batch,dim] -> [batch]
+    #     if self.predict_method == 'PDA':
+    #         item_weight = self.propensity_score[item].to(self.device)
+    #         score = score * item_weight
+    #     return score
 
 class MACRRecommender(AbstractRecommender):
     def __init__(self, config, dataset):
@@ -736,41 +732,8 @@ class MACRRecommender(AbstractRecommender):
         self.module_loss = nn.BCEWithLogitsLoss()
         self.sigmoid = nn.Sigmoid()
 
-    def get_user_embedding(self, user):
+    def forward(self, user, item) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
         raise NotImplementedError
-    
-    def get_item_embedding(self, item):
-        raise NotImplementedError
-    
-    # def _forward(self, user, item) -> tuple[torch.Tensor, torch.Tensor]:
-    #     raise NotImplementedError
-
-    def forward(self, user, item):
-        user_e, item_e = self._forward(user, item)
-
-        user_e = user_e[user]
-        item_e = item_e[item]
-
-        yk = torch.mul(user_e, item_e).sum(dim=1)
-        yu = self.sigmoid(self.user_module(user_e)).squeeze(-1)
-        yi = self.sigmoid(self.item_module(item_e)).squeeze(-1)
-        yui = self.sigmoid(yk * yu * yi)
-
-        return yk, yui, yu, yi
-    
-    # def calculate_loss(self, interaction):
-    #     user = interaction[self.USER_ID]
-    #     item = interaction[self.ITEM_ID]
-    #     neg_item = interaction[self.LABEL]
-
-    #     yk, yui, yu, yi = self.forward(user, item)
-    #     loss_o = self.loss(yui, label)
-    #     loss_i = self.loss(yi, label)
-    #     loss_u = self.loss(yu, label)
-
-    #     loss = loss_o + self.item_loss_weight * loss_i + self.user_loss_weight * loss_u
-
-    #     return loss
     
     def predict(self, interaction):
         user = interaction[self.USER_ID]
@@ -790,6 +753,47 @@ class MACRRecommender(AbstractRecommender):
         score = (yk - self.c) * yu * yi
         return score.view(-1)
 
+class PCCRecommender(AbstractRecommender):
+    """Abstract recommender with PCC regularization between predicted 
+    preference scores for positive user-item pairs and corresponding item popularity
+    
+    TLDR: min_\\theta L_{Rec} + lambda*PCC(^R_+,pop(I))^2
+    """
+    
+    type = ModelType.GENERAL
+    
+    def __init__(self, config, dataset):
+        super().__init__(config, dataset)
+        
+        # load dataset info
+        self.USER_ID = config["USER_ID_FIELD"]
+        self.ITEM_ID = config["ITEM_ID_FIELD"]
+        self.PROPENSITIES = config["PROPENSITY_FIELD"]
+        self.NEG_ITEM_ID = config["NEG_PREFIX"] + self.ITEM_ID
+        self.n_users = dataset.num(self.USER_ID)
+        self.n_items = dataset.num(self.ITEM_ID)
+        self.item_pop = dataset.item_pop
+
+        # load parameters info
+        self.device = config["device"]
+        self.gamma = config["reg_weight"] # rename self.gamma to self.reg_weight
+        
+    def pearson_correlation(self, x: torch.Tensor, y: torch.Tensor) -> torch.Tensor:
+        """
+        Compute Pearson correlation coefficient between two 1D tensors.
+        torch.corrcoef returns a [2, 2] matrix where [0, 1] is the correlation.
+        """
+        stacked = torch.stack([x, y])   # [2, N]
+        return torch.corrcoef(stacked)[0, 1]
+    
+    def calculate_loss(self, interaction: Interaction) -> torch.Tensor:
+        item_ids = interaction[self.ITEM_ID]
+        loss, scores = self._calculate_loss(interaction)
+        
+        pcc = self.pearson_correlation(scores, self.item_pop[item_ids])
+        reg = pcc**2
+        
+        return loss + self.gamma * reg
 
 
 class FairRecommender(AbstractRecommender):

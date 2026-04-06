@@ -2508,11 +2508,11 @@ class Dataset(torch.utils.data.Dataset):
         )
 
     def calculate_mask(self):
-        mask = torch.zeros((self.n_users, self.n_items), dtype=torch.bool)
+        mask = torch.zeros((self.n_users, self.n_items), dtype=torch.float)
 
         users = self.inter_feat["user_id"]
         items = self.inter_feat["item_id"]
 
-        mask[users, items] = True
+        mask[users, items] = 1.0
 
         self.mask = mask

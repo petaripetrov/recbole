@@ -16,10 +16,10 @@ import torch.nn as nn
 from recbole.model.init import xavier_normal_initialization
 from recbole.model.loss import BPRLoss
 from recbole.utils import InputType
-from recbole.model.abstract_recommender import IPSRecommender
+from recbole.model.abstract_recommender import GeneralRecommender, IPSRecommender
 
 
-class _MF(IPSRecommender):
+class _MF(GeneralRecommender):
     r"""
         MF model
     """
@@ -29,11 +29,8 @@ class _MF(IPSRecommender):
         super(_MF, self).__init__(config, dataset)
 
         self.LABEL = config['LABEL_FIELD']
-        # self.n_items = dataset.
-
         # load parameters info
         self.embedding_size = config['embedding_size']
-        print(config)
 
         # define layers and loss
         self.user_embedding = nn.Embedding(self.n_users, self.embedding_size)
@@ -71,7 +68,7 @@ class _MF(IPSRecommender):
         item_e = self.get_item_embedding(item)
         return torch.mul(user_e, item_e).sum(dim=1)
 
-    def calculate_loss(self, interaction):
+    def _calculate_loss(self, interaction):
         user = interaction[self.USER_ID]
         item = interaction[self.ITEM_ID]
         label = interaction[self.LABEL]
