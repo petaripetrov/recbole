@@ -109,17 +109,17 @@ class Collector(object):
         if self.register.need("data.tail_set"):
             tail_set = train_data.dataset.tail_set
 
-            self.logger.info(
-                f"Tail set contains {set_color(str(len(tail_set)), 'blue')} items."
-            )
+            # self.logger.info(
+            #     f"Tail set contains {set_color(str(len(tail_set)), 'blue')} items."
+            # )
 
             self.data_struct.set("data.tail_set", tail_set)
         if self.register.need("data.head_set"):
             head_set = train_data.dataset.head_set
 
-            self.logger.info(
-                f"Head set contains {set_color(str(len(head_set)), 'blue')} items."
-            )
+            # self.logger.info(
+            #     f"Head set contains {set_color(str(len(head_set)), 'blue')} items."
+            # )
 
             self.data_struct.set("data.head_set", head_set)
 

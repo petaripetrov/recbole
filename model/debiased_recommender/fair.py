@@ -16,7 +16,7 @@ class RegLossToOne(nn.Module):
         self.l2 = l2
 
     def forward(self, parameters: torch.Tensor):
-        return self.l2 * torch.sum(torch.square(parameters - 1))
+        return self.l2 * torch.mean(torch.square(parameters - 1))
 
 class Filter(nn.Module):
     def __init__(self, input_dim, filter_units = [128, 128, 128, 128, 128], reg_term=0.0001):
@@ -119,7 +119,7 @@ class Discriminator(nn.Module):
             self.reg_loss += self.reg_term * self.emb_loss(embedding)
 
         pred: torch.Tensor = self.pred_layer(embedding)
-        pred = self.sigmoid(pred)
+        # pred = self.sigmoid(pred)
         return pred.squeeze(-1)
     
 class BaseRecModel(nn.Module): # BPR equivalent?
@@ -158,7 +158,7 @@ class FAiR(AbstractRecommender):
 
     input_type = InputType.PAIRWISE
 
-    def __init__(self, config, dataset, d_step=5, g_step=1, reg_term=0.0001, n_user_samples=200, n_item_samples=128, lambda1 = 1.0, lambda2 = 1.0, lambda3 = 1.0, dimension=128):
+    def __init__(self, config, dataset, d_step=5, g_step=1, reg_term=0.0001, n_user_samples=200, n_item_samples=128, lambda1 = 0.4, lambda2 = 0.4, lambda3 = 0.8, dimension=128):
         super(FAiR, self).__init__()
 
         self.USER_ID = config["USER_ID_FIELD"]
@@ -166,6 +166,7 @@ class FAiR(AbstractRecommender):
         self.PROPENSITIES = config["PROPENSITY_FIELD"]
         self.NEG_ITEM_ID = config["NEG_PREFIX"] + self.ITEM_ID
         self.RATING = config['RATING_FIELD']
+        self.device = config["device"]
         self.n_users = dataset.num(self.USER_ID)
         self.n_items = dataset.num(self.ITEM_ID)
 
@@ -179,8 +180,8 @@ class FAiR(AbstractRecommender):
         self.l2 = lambda2
         self.l3 = lambda3
 
-        user_group = torch.zeros(self.n_users)
-        item_group = torch.zeros(self.n_items)
+        user_group = dataset.user_map
+        item_group = dataset.protected_map
         # avg_rating_df = pd.DataFrame(df.groupby('item')['rating'].mean())
         avg_rating = dataset.avg_rating
         self.register_buffer('user_group', user_group.detach().clone().long().squeeze())
@@ -202,9 +203,12 @@ class FAiR(AbstractRecommender):
         self.rec_model = BaseRecModel(filter_out_dim * 2)
         
         self.pretrain_loss = nn.MSELoss()
-        self.user_d_loss = nn.BCELoss()
-        self.item_d_loss = nn.BCELoss()
-        self.im_d_loss = nn.BCELoss()
+        user_pos_weight = torch.tensor(
+            (1 - self.user_group.float().mean()) / self.user_group.float().mean()
+        ).to(self.device)
+        self.user_d_loss = nn.BCEWithLogitsLoss(pos_weight=user_pos_weight)
+        self.item_d_loss = nn.BCEWithLogitsLoss()
+        self.im_d_loss = nn.BCEWithLogitsLoss()
         self.rec_loss = nn.MSELoss() # torch.F.mse_loss()
 
         self.pretrain_optimizer = torch.optim.Adam(
@@ -224,6 +228,7 @@ class FAiR(AbstractRecommender):
 
         self.is_pretrained = False
 
+
     def forward(self, user, item, training=True):
         self.user_filter.train(training)
         self.item_filter.train(training)
@@ -235,12 +240,15 @@ class FAiR(AbstractRecommender):
         joint_emb = torch.cat([user_emb, item_emb], dim=-1)
         result = self.rec_model(joint_emb)
 
-        return result.squeeze()
+        return result.squeeze(), user_emb, item_emb
     
     def predict(self, interaction):
         user = interaction[self.USER_ID]
         item = interaction[self.ITEM_ID]
-        return self.forward(user, item, training=False)
+
+        res, _, _ = self.forward(user, item, training=False)
+        
+        return res
     
     def calculate_loss(self, interaction):
         user = interaction[self.USER_ID]
@@ -253,9 +261,12 @@ class FAiR(AbstractRecommender):
             return self._adv_train(user, item, rating)
         
     def _pretrain(self, user, item, rating):
+        self.pretrain_optimizer.zero_grad()
+
         user_emb = self.user_embedding_layer(user)
         item_emb = self.item_embedding_layer(item)
-        out = torch.sum(user_emb * item_emb, dim=1).squeeze()
+        
+        out = torch.sum(user_emb * item_emb, dim=1)
         loss = self.pretrain_loss(out, rating)
 
         loss.backward()
@@ -264,7 +275,7 @@ class FAiR(AbstractRecommender):
     
     def _adv_train(self, user, item, y_true):
         device = user.device
-
+        
         # --- Sample random users/items ---
         # These embeddings are computed OUTSIDE the discriminator gradient tape
         # in the original, so we use no_grad here
@@ -287,7 +298,7 @@ class FAiR(AbstractRecommender):
         sampled_items = sampled_item_ids.repeat(self.n_user_samples)
 
         with torch.no_grad():
-            ru_vectors = self.forward(sampled_users, sampled_items, training=False)
+            ru_vectors, _, _ = self.forward(sampled_users, sampled_items, training=False)
             ru_vectors = ru_vectors.reshape(self.n_user_samples, self.n_item_samples)
             t = sampled_item_ids.max()
             ro_vectors = self.average_rating[sampled_item_ids].reshape(1, self.n_item_samples)
@@ -342,29 +353,39 @@ class FAiR(AbstractRecommender):
 
             # These are recomputed inside the g_step loop with training=True
             # so BatchNorm and gradients behave correctly
-            user_emb = self.user_filter(self.user_embedding_layer(user), training=True)
-            item_emb = self.item_filter(self.item_embedding_layer(item), training=True)
+            # user_emb = self.user_filter(self.user_embedding_layer(user), training=True)
+            # item_emb = self.item_filter(self.item_embedding_layer(item), training=True)
 
-            rec_pred = self.forward(user, item, training=True)
+            rec_pred, user_emb, item_emb = self.forward(user, item, training=True)
             
             with torch.no_grad():
-                ru_vectors = self.forward(sampled_users, sampled_items, training=False)
+                ru_vectors, _, _ = self.forward(sampled_users, sampled_items, training=False)
                 ru_vectors = ru_vectors.reshape(n_sampled_user, self.n_item_samples)
                 
             ru_pred = self.implicit_discriminator(ru_vectors)
             user_group_pred = self.user_explicit_discriminator(user_emb)
             item_group_pred = self.item_explicit_discriminator(item_emb)
 
+            rec_loss = self.rec_loss(rec_pred, y_true)
+            user_d = self.user_d_loss(user_group_pred, user_group_true)
+            item_d = self.item_d_loss(item_group_pred, item_group_true)
+            im_d = self.im_d_loss(ru_pred.reshape(ru_labels.shape), ru_labels)
+
             g_loss = (
-                self.rec_loss(rec_pred, y_true)
-                + self.l1 * self.user_d_loss(user_group_pred, user_group_true)
-                + self.l2 * self.item_d_loss(item_group_pred, item_group_true)
-                + self.l3 * self.im_d_loss(ru_pred.reshape(ru_labels.shape), ru_labels)
+                rec_loss
+                + self.l1 * user_d
+                + self.l2 * item_d
+                + self.l3 * im_d
                 # Filter losses from both user and item filters
                 # equivalent to tf.add_n(self.user_filter.losses) in original
                 + self.user_filter.alpha_reg_loss + self.user_filter.beta_reg_loss
                 + self.item_filter.alpha_reg_loss + self.item_filter.beta_reg_loss
             )
+
+            # print(f"rec: {rec_loss.item():.4f}, user_d: {user_d.item():.4f}, "
+            #     f"item_d: {item_d.item():.4f}, im_d: {im_d.item():.4f}, "
+            #     f"alpha_reg: {(self.user_filter.alpha_reg_loss + self.item_filter.alpha_reg_loss).item():.4f}, "
+            #     f"beta_reg: {(self.user_filter.beta_reg_loss + self.item_filter.beta_reg_loss).item():.4f}")
 
             g_loss.backward()
             self.g_optimizer.step()

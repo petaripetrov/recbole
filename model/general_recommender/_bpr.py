@@ -41,7 +41,6 @@ class _BPR(GeneralRecommender):
         self.loss = BPRLoss()
 
         # parameters initialization
-        self.apply(xavier_normal_initialization)
 
     def get_user_embedding(self, user):
         r"""Get a batch of user embedding tensor according to input user's id.

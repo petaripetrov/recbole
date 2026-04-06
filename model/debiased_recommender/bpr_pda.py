@@ -2,11 +2,15 @@ import torch
 
 from recbole.model.abstract_recommender import PDARecommender
 from recbole.model.general_recommender._bpr import _BPR
+from recbole.model.init import xavier_normal_initialization
 
 
 class BPR_PDA(PDARecommender, _BPR):
     def __init__(self, config, dataset):
         super().__init__(config, dataset)
+
+        self.apply(xavier_normal_initialization)
+
 
 
     def forward(self, user, item) -> tuple[torch.Tensor, torch.Tensor]:

@@ -2408,6 +2408,10 @@ class Dataset(torch.utils.data.Dataset):
     def build_rel_sets(self):
         self.tail_set = self._calc_tail_set()
         self.head_set = self._calc_head_set()
+        self.calculate_mask()
+
+        item_inter = torch.tensor(self.inter_feat["item_id"].values)
+        self.item_pop = torch.bincount(item_inter, minlength=self.n_items) 
 
         #Taken directly from https://github.com/mediumboat/FAiR/blob/7848a0c63730128f234a2fd894de97805556b4f8/dataloader.py#L54
         avg_rating = pd.DataFrame(self.inter_feat.groupby('item_id')['rating'].mean())
@@ -2415,15 +2419,39 @@ class Dataset(torch.utils.data.Dataset):
 
         self.avg_rating = avg_rating
         # Not used anymore
-        if self.build_protected_map:
-            protected_map = torch.zeros(self.item_num, dtype=torch.int64)
+        # if self.build_protected_map:
+        protected_map = torch.zeros(self.item_num, dtype=torch.int64)
+        
+        for i in range(self.item_num):
+            if i + 1 in self.tail_set:
+                protected_map[i] = 1
+        
+        self.protected_map = protected_map
 
-            for i in range(self.item_num):
-                if i + 1 in self.tail_set:
-                    protected_map[i] = 1
+        total = 0
+        counts = self.user_counter.most_common()
 
-            self.protected_map = protected_map
+        for _, val in counts:
+            total += val
 
+        head = set()
+        head_total = 0.0
+        for key, val in counts:
+            pop_ratio = val / total
+            head_total += pop_ratio
+
+            if head_total >= self.head_ratio:
+                break
+
+            head.add(key)
+
+        user_map = torch.zeros(self.user_num, dtype=torch.int64)
+
+        for i in range(self.user_num):
+            if i + 1 in head:
+                user_map[i] = 1
+        
+        self.user_map = user_map
             
     def weighted_intervention(self):
         w = self.WTD_w[: self.inter_num]
@@ -2479,3 +2507,12 @@ class Dataset(torch.utils.data.Dataset):
             item_counts / item_counts.sum(), eps, None
         )
 
+    def calculate_mask(self):
+        mask = torch.zeros((self.n_users, self.n_items), dtype=torch.bool)
+
+        users = self.inter_feat["user_id"]
+        items = self.inter_feat["item_id"]
+
+        mask[users, items] = True
+
+        self.mask = mask
