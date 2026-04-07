@@ -117,6 +117,8 @@ class Dataset(torch.utils.data.Dataset):
         self.tail_ratio = config["tail_ratio"]
         self.head_ratio = config["head_ratio"]
         self.build_protected_map = False
+        self.alpha = config["pda_alpha"]
+        self.gamma = config["pda_gamma"]
 
         # if config["use_WTD"]:
             # TODO perhaps we should calculate the tail and head sets ahead of time in case WTD is messing with this too much
@@ -1458,9 +1460,39 @@ class Dataset(torch.utils.data.Dataset):
             p_O = self.p_O
 
             p_O_Y = p_Y_O / p_Y * p_O
-
             column = "rating"
             return p_O_Y, column
+        elif self.pscore_method == "PDA":
+            # What I think is an approximation of what the PDA paper does,
+            # whether this is actually correct or not, I do not know.
+            inter = self.inter_feat
+            
+            if "timestamp" in inter.columns:
+                inter.sort(by=["timestamp"])
+            
+            inter_len = len(self.inter_feat)
+            inter_chunk = inter_len // 9
+            
+            inter_end = inter_len
+            inter_start = inter_end - inter_chunk
+            
+            m_t = inter[inter_start:inter_end]
+            m_t = torch.bincount(m_t["item_id"], minlength=self.n_items)
+            m_t = m_t / torch.sum(m_t)
+            
+            inter_end = inter_start
+            inter_start = inter_end - inter_chunk
+            
+            m_t_1 = inter[inter_start:inter_end]
+            m_t_1 = torch.bincount(m_t_1["item_id"], minlength=self.n_items)
+            m_t_1 = m_t / torch.sum(m_t_1)
+            
+            # item = torch.bincount(inter["item_id"], minlength=self.n_items)
+            # item = item / sum(item)
+            
+            m_i = m_t + self.alpha*(m_t - m_t_1)
+            
+            return torch.pow(m_i, self.gamma), "item_id"
         else:
             raise NotImplementedError(f"Unknown `pscore_method`: {self.pscore_method}")
 
