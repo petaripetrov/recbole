@@ -772,10 +772,11 @@ class PCCRecommender(AbstractRecommender):
         self.NEG_ITEM_ID = config["NEG_PREFIX"] + self.ITEM_ID
         self.n_users = dataset.num(self.USER_ID)
         self.n_items = dataset.num(self.ITEM_ID)
-        self.item_pop = dataset.item_pop
+        item_pop = dataset.item_pop
 
         # load parameters info
         self.device = config["device"]
+        self.item_pop = item_pop.to(self.device)
         self.gamma = config["reg_weight"] # rename self.gamma to self.reg_weight
         
     def pearson_correlation(self, x: torch.Tensor, y: torch.Tensor) -> torch.Tensor:
