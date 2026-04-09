@@ -22,6 +22,7 @@ from recbole.evaluator.utils import apply_fa_ir
 from recbole.utils import set_color
 import fairsearchcore as fsc
 from fairsearchcore.models import FairScoreDoc
+from tqdm import tqdm
 
 
 class DataStruct(object):
@@ -213,9 +214,11 @@ class Collector(object):
 
         if self.register.need("rec.topk"):
             if self.config["with_fa_ir"]:
+                FAIR_SIZE = min(100, len(scores_tensor[0]))
                 _, order_idx = torch.topk(
-                    scores_tensor, len(scores_tensor[0]), dim=-1
+                    scores_tensor, FAIR_SIZE, dim=-1
                 )  # n_users x k
+                
                 prot_map = self.data_struct.get("data.prot_map")
 
                 topk_idx = []
