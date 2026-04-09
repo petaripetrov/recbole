@@ -133,7 +133,9 @@ class Trainer(AbstractTrainer):
         
         # TODO Instead set the model type to PC(Popularity Compensated) and create 
         # a new trainer for this.
-        self.popularity_comp = config["popularity_compensation"] 
+        self.popularity_comp = config["popularity_comp"] 
+        self.pc_alpha = config.get("pc_alpha", 1.0)
+        self.pc_beta = config.get("pc_beta", 0.5)
         
         self.start_epoch = 0
         self.cur_step = 0
@@ -558,7 +560,7 @@ class Trainer(AbstractTrainer):
             # TODO try equalized attention here too this way
             train_mask = self.train_mask[interaction["user_id"]].to(scores.device)
             train_mask[:, 0] = True
-            scores = self.popularity_compensation(scores, self.item_pop.to(scores.device), train_mask)
+            scores = self.popularity_compensation(scores, self.item_pop.to(scores.device), train_mask, self.pc_alpha, self.pc_beta)
         
 
         scores[:, 0] = -np.inf
@@ -703,7 +705,7 @@ class Trainer(AbstractTrainer):
         uninteracted_mask = 1.0 - train_mask
         
         #1. Calculate C_ui
-        pop_inv = 1.0 / item_popularity.clamp(min=1.0)
+        pop_inv = 1.0 / item_popularity.clamp(min=1)
         c_ui = pop_inv * (scores * beta + (1.0 - beta))
         
         #2. Calculate n_u and m_u
