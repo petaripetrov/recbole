@@ -14,27 +14,27 @@ class MF_PDA(PDARecommender, _MF):
     def calculate_loss(self, interaction):
         return super().calculate_loss(interaction)
         
-    # def forward(self, user, item):
-    #     user_e = self.get_user_embedding(user)
-    #     item_e = self.get_item_embedding(item)
-    #     return torch.mul(user_e, item_e).sum(dim=1), user_e, item_e
+    def forward(self, user, item):
+        user_e = self.get_user_embedding(user)
+        item_e = self.get_item_embedding(item)
+        return torch.mul(user_e, item_e).sum(dim=1), user_e, item_e
 
-    # def calculate_loss(self, interaction):
-    #     user = interaction[self.USER_ID]
-    #     item = interaction[self.ITEM_ID]
-    #     label = interaction[self.LABEL]
+    def calculate_loss(self, interaction):
+        user = interaction[self.USER_ID]
+        item = interaction[self.ITEM_ID]
+        label = interaction[self.LABEL]
         
-    #     weight = self.propensity_score[item].to(self.device)
+        weight = self.propensity_score[item].to(self.device)
         
-    #     score, user_e, item_e = self.forward(user, item)
+        score, user_e, item_e = self.forward(user, item)
         
-    #     score = self.elu(score) + 1
-    #     score *= weight
+        score = self.elu(score) + 1
+        score *= weight
         
-    #     loss = self.loss(score, label)
-    #     reg_loss = self.reg_weight * self.reg_loss(user_e, item_e)
+        loss = self.loss(score, label)
+        reg_loss = self.reg_weight * self.reg_loss(user_e, item_e)
         
-    #     return loss + reg_loss
+        return loss + reg_loss
 
     def predict(self, interaction):
         user = interaction[self.USER_ID]
