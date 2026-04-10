@@ -12,7 +12,7 @@ class MF_PDA(PDARecommender, _MF):
         return super().forward(user, item)
     
     def calculate_loss(self, interaction):
-        return super().calculate_loss(interaction)
+        return super()._calculate_loss(interaction)
         
     def forward(self, user, item):
         user_e = self.get_user_embedding(user)
