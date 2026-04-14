@@ -2,6 +2,7 @@ import torch
 
 from recbole.model.abstract_recommender import MACRRecommender
 from recbole.model.general_recommender._bpr import _BPR
+from recbole.model.init import xavier_normal_initialization
 from recbole.utils.enum_type import InputType
 
 
@@ -10,6 +11,9 @@ class BPR_MACR(MACRRecommender, _BPR):
     
     def __init__(self, config, dataset):
         super().__init__(config, dataset)
+
+        self.apply(xavier_normal_initialization)
+        
     
     def forward(self, user, item):
         user_e = self.get_user_embedding(user)
@@ -18,7 +22,7 @@ class BPR_MACR(MACRRecommender, _BPR):
         yk = torch.mul(user_e, item_e).sum(dim=1)
         yu = self.sigmoid(self.user_module(user_e)).squeeze(-1)
         yi = self.sigmoid(self.item_module(item_e)).squeeze(-1)
-        yui = yk * yu * yi
+        yui = self.sigmoid(yk * yu * yi)
         
         return yk, yui, yu, yi
     
@@ -50,10 +54,10 @@ class BPR_MACR(MACRRecommender, _BPR):
         label_pos = torch.ones_like(yu_logit)
         label_neg = torch.zeros_like(yi_neg_logit)
         
-        # not 100% sure how to translate BPR loss here so instead
-        # we are doing BCE loss with some confident guesses? 
-        #
-        # It might be beneficial to 
+        # # not 100% sure how to translate BPR loss here so instead
+        # # we are doing BCE loss with some confident guesses? 
+        # #
+        # # It might be beneficial to 
         loss_u = self.module_loss(yu_logit, label_pos) 
         loss_i = self.module_loss(yi_pos_logit, label_pos) + self.module_loss(yi_neg_logit, label_neg)
         

@@ -777,7 +777,7 @@ class PCCRecommender(AbstractRecommender):
         # load parameters info
         self.device = config["device"]
         self.item_pop = item_pop.to(self.device)
-        self.gamma = config["reg_weight"] # rename self.gamma to self.reg_weight
+        self.gamma = config["pcc_reg_weight"] # rename self.gamma to self.reg_weight
         
     def pearson_correlation(self, x: torch.Tensor, y: torch.Tensor) -> torch.Tensor:
         """
