@@ -49,5 +49,5 @@ class BPR_PDA(PDARecommender, _BPR):
         score = self.elu(torch.matmul(user_e, all_item_e.transpose(0, 1))) + 1  # [user_batch_num,item_tot_num]
         if self.predict_method == 'PDA':
             item_weight = self.propensity_score.to(self.device)
-            score = score * item_weight
+            score = score * item_weight.unsqueeze(0)
         return score.view(-1)
