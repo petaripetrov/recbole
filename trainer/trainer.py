@@ -702,51 +702,51 @@ class Trainer(AbstractTrainer):
     
     @torch.no_grad()
     def popularity_compensation(self, scores, item_popularity, train_mask, alpha=1.0, beta=0.5):
-        uninteracted_mask = 1.0 - train_mask
+        # uninteracted_mask = 1.0 - train_mask
         
-        #1. Calculate C_ui
-        pop_inv = 1.0 / item_popularity.clamp(min=1)
-        c_ui = pop_inv * (scores * beta + (1.0 - beta))
+        # #1. Calculate C_ui
+        # pop_inv = 1.0 / item_popularity.clamp(min=1)
+        # c_ui = pop_inv * (scores * beta + (1.0 - beta))
         
-        #2. Calculate n_u and m_u
-        u_scores = scores * uninteracted_mask
-        u_comp = c_ui * uninteracted_mask
+        # #2. Calculate n_u and m_u
+        # u_scores = scores * uninteracted_mask
+        # u_comp = c_ui * uninteracted_mask
         
         # Skip division by (M - |O_u+|) because it cancels out
-        n_u = torch.norm(u_scores, p=2, dim=1, keepdim=True)
-        m_u = torch.norm(u_comp, p=2, dim=1, keepdim=True)
         
-        factor = n_u / m_u.clamp(min=1e-9)
         
-        # scores = torch.where(torch.isinf(scores), torch.full_like(scores, -1e9), scores)
-        # # User norm (n_u)
-        # uninteract = ~train_mask
-        # uninteract_scores = scores * uninteract.float()
+        scores = torch.where(torch.isinf(scores), torch.full_like(scores, -1e9), scores)
+        # User norm (n_u)
+        uninteract = 1.0 - train_mask
+        uninteract_scores = scores * uninteract.float()
+        n_u = torch.norm(uninteract_scores, p=2, dim=1, keepdim=True)
         
-        # # n_u = ||scores_uninteracted||_2 / (M - |O_u+|)
-        # f_norm = torch.norm(uninteract_scores, p=2, dim=1)
+        # n_u = ||scores_uninteracted||_2 / (M - |O_u+|)
+        f_norm = torch.norm(uninteract_scores, p=2, dim=1)
 
-        # # Count of uninteracted items (M - |O_u+|)
-        # # M is scores.shape[1], |O_u+| is train_mask.sum(dim=1)
-        # num_uninteracted = uninteract.sum(dim=1).float()
+        # Count of uninteracted items (M - |O_u+|)
+        # M is scores.shape[1], |O_u+| is train_mask.sum(dim=1)
+        num_uninteracted = uninteract.sum(dim=1).float()
 
-        # n_u = f_norm / torch.clamp(num_uninteracted, min=1.0)
+        n_u = f_norm / torch.clamp(num_uninteracted, min=1.0)
 
-        # inv_pop = 1.0 / torch.clamp(item_popularity.float(), min=1.0)
-        # # compensation score (C_ui)
-        # # C_ui = (1 / pop_i) * (R_ui * beta + 1 - beta)
+        inv_pop = 1.0 / torch.clamp(item_popularity.float(), min=1.0)
+        # compensation score (C_ui)
+        # C_ui = (1 / pop_i) * (R_ui * beta + 1 - beta)
 
-        # c_ui = inv_pop * (scores * beta + (1 - beta))
-        # uninteract_c_ui = c_ui * uninteract.float()
-        # c_norm = torch.norm(uninteract_c_ui, p=2, dim=1)
-        # m_u = c_norm / torch.clamp(num_uninteracted, min=1.0)
+        c_ui = inv_pop * (scores * beta + (1 - beta))
+        uninteract_c_ui = c_ui * uninteract.float()
+        c_norm = torch.norm(uninteract_c_ui, p=2, dim=1)
+        m_u = c_norm / torch.clamp(num_uninteracted, min=1.0)
         
-        # m_u = torch.clamp(m_u, min=1e-9)
+        m_u = torch.clamp(m_u, min=1e-9)
         
-        # # R_tilde = R_ui + alpha * n_u * C_ui
-        # scaling = n_u/m_u
-        # adjusted_scores = scores + alpha * scaling.unsqueeze(1) * c_ui
+        # R_tilde = R_ui + alpha * n_u * C_ui
+        scaling = n_u/m_u
+        adjusted_scores = scores + alpha * scaling.unsqueeze(1) * c_ui
+        # factor = n_u / m_u.clamp(min=1e-9)
 
+        return adjusted_scores
         return scores + (alpha * c_ui * factor)
 
     def _map_reduce(self, result, num_sample):
