@@ -2,7 +2,7 @@ cff-version: 1.2.0
 message: "If you use this softwae, please cite it as bellow"
 authors:
   - family-names: Petrov
-    given-names: Petarr
+    given-names: Petar
   - family-names: RecBole Team
 title: "RecBole - Algorithmic Bias add-on"
 version: 2.0.4
