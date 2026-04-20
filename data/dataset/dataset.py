@@ -1630,13 +1630,13 @@ class Dataset(torch.utils.data.Dataset):
         tail = set()
         tail_total = 0.0
         for key, val in item_tuples:
+            tail.add(key)
             pop_ratio = val / total
             tail_total += pop_ratio
 
             if tail_total >= self.tail_ratio:
                 break
 
-            tail.add(key)
 
         return tail
 
@@ -2455,7 +2455,7 @@ class Dataset(torch.utils.data.Dataset):
         protected_map = torch.zeros(self.item_num, dtype=torch.int64)
         
         for i in range(self.item_num):
-            if i + 1 in self.tail_set:
+            if i in self.tail_set:
                 protected_map[i] = 1
         
         self.protected_map = protected_map

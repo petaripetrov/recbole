@@ -24,7 +24,7 @@ class MF_PDA(PDARecommender, _MF):
         item = interaction[self.ITEM_ID]
         label = interaction[self.LABEL]
         
-        weight = self.propensity_score[item].to(self.device)
+        weight = self.propensity_score[interaction[self.column]].to(self.device)
         
         score, user_e, item_e = self.forward(user, item)
         
@@ -43,7 +43,7 @@ class MF_PDA(PDARecommender, _MF):
         score = self.elu(score) + 1
 
         if self.predict_method == "PDA":
-            item_weight = self.propensity_score[item].to(self.device)
+            item_weight = self.propensity_score[interaction[self.column]].to(self.device)
             score = score * item_weight
 
         return score
