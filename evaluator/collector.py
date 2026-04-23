@@ -127,6 +127,20 @@ class Collector(object):
 
         if self.register.need("data.prot_map"):
             self.data_struct.set("data.prot_map", train_data.dataset.protected_map)
+            
+        if self.register.need("data.user_map"):
+            user_map = train_data.dataset.user_map
+            
+            keys, counts = torch.unique(user_map, return_counts=True)
+            
+            self.logger.info(
+                f"User group map contains keys:\t {set_color(', '.join(str(x) for x in keys.tolist()), 'blue')}\n"
+            )
+            self.logger.info(
+                 f"User group map counts per k:\t {set_color(', '.join(str(x) for x in counts.tolist()), 'blue')}"
+            )
+            
+            self.data_struct.set("data.user_map", train_data.dataset.user_map)
 
     def _average_rank(self, scores):
         """Get the ranking of an ordered tensor, and take the average of the ranking for positions with equal values.

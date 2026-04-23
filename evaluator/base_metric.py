@@ -39,6 +39,26 @@ class AbstractMetric(object):
             dict: such as ``{'metric@10': 3153, 'metric@20': 0.3824}``
         """
         raise NotImplementedError("Method [calculate_metric] should be implemented.")
+    
+    def calculate_group_metric(self, value):
+        if self.map is None:
+            raise NotImplementedError("Method [calculate_group_metric] requires self.map object")
+        
+        avg_res = value.mean(axis=1)
+        val_tensor = torch.tensor(avg_res, dtype=torch.float32)
+        
+        index = self.map[1:]
+        max_groups = self.map.max().item() + 1
+        
+        result = torch.zeros(max_groups).scatter_reduce(
+            dim=0,
+            index=index,
+            src=val_tensor,
+            reduce="mean",
+            include_self=True
+        )
+        
+        return result
 
 
 class TopkMetric(AbstractMetric):
@@ -50,7 +70,7 @@ class TopkMetric(AbstractMetric):
     """
 
     metric_type = EvaluatorType.RANKING
-    metric_need = ["rec.topk"]
+    metric_need = ["rec.topk", "data.user_map"]
 
     def __init__(self, config):
         super().__init__(config)
@@ -61,6 +81,7 @@ class TopkMetric(AbstractMetric):
         and number of positive items for each user.
         """
         rec_mat = dataobject.get("rec.topk")
+        self.map = dataobject.get("data.user_map")
         _, K = rec_mat.shape
         max_top_k = max(self.topk)
         topk_idx, _ ,pos_len_list = torch.split(rec_mat, [max_top_k, K - max_top_k - 1, 1], dim=1)
@@ -78,9 +99,14 @@ class TopkMetric(AbstractMetric):
         """
         metric_dict = {}
         avg_result = value.mean(axis=0)
+        
         for k in self.topk:
             key = "{}@{}".format(metric, k)
             metric_dict[key] = round(avg_result[k - 1], self.decimal_place)
+            
+        if self.map is not None:
+            key = "{}-group@{}".format(metric, max(self.topk))
+            metric_dict[key] = self.calculate_group_metric(value)
         return metric_dict
 
     def metric_info(self, pos_index, pos_len=None):
@@ -138,3 +164,15 @@ class LossMetric(AbstractMetric):
         raise NotImplementedError(
             "Method [metric_info] of loss-based metric should be implemented."
         )
+        
+class UserGroupMetric(TopkMetric):
+    metric_type = EvaluatorType.VALUE
+    metric_need = ["rec.topk"]
+    
+    def __init__(self, config):
+        super().__init__(config)
+        
+        
+        
+        
+        

@@ -555,7 +555,7 @@ class ItemCoverage(AbstractMetric):
     """
 
     metric_type = EvaluatorType.RANKING
-    metric_need = ["rec.items", "data.num_items"]
+    metric_need = ["rec.items", "data.num_items", "data.user_map"]
 
     def __init__(self, config):
         super().__init__(config)
@@ -565,6 +565,7 @@ class ItemCoverage(AbstractMetric):
         """Get the matrix of recommendation items and number of items in total item set"""
         item_matrix = dataobject.get("rec.items")
         num_items = dataobject.get("data.num_items")
+        self.map = dataobject.get("data.user_map")
         return item_matrix.numpy(), num_items
 
     def calculate_metric(self, dataobject):
@@ -575,6 +576,10 @@ class ItemCoverage(AbstractMetric):
             metric_dict[key] = round(
                 self.get_coverage(item_matrix[:, :k], num_items), self.decimal_place
             )
+            
+        max_k = max(self.topk)
+        key = "{}-group@{}".format("itemcoverage", max_k)
+        metric_dict[key] = self.get_group_coverage(item_matrix, num_items)
         return metric_dict
 
     def get_coverage(self, item_matrix, num_items):
@@ -589,6 +594,19 @@ class ItemCoverage(AbstractMetric):
         """
         unique_count = np.unique(item_matrix).shape[0]
         return unique_count / num_items
+    
+    def get_group_coverage(self, item_matrix, num_items):
+        index = self.map[1:].numpy()
+        num_groups = self.map.max().item() + 1
+        
+        group_coverages = []
+        for g in range(num_groups):
+            user_mask = index == g
+            group_items = item_matrix[user_mask]
+            coverage = self.get_coverage(group_items, num_items)
+            group_coverages.append(round(coverage, self.decimal_place))
+            
+        return group_coverages
 
 
 class AveragePopularity(AbstractMetric):
@@ -735,7 +753,7 @@ class GiniIndex(AbstractMetric):
 
     metric_type = EvaluatorType.RANKING
     smaller = True
-    metric_need = ["rec.items", "data.num_items"]
+    metric_need = ["rec.items", "data.num_items", "data.user_map"]
 
     def __init__(self, config):
         super().__init__(config)
@@ -745,6 +763,7 @@ class GiniIndex(AbstractMetric):
         """Get the matrix of recommendation items and number of items in total item set"""
         item_matrix = dataobject.get("rec.items")
         num_items = dataobject.get("data.num_items")
+        self.map = dataobject.get("data.user_map")
         return item_matrix.numpy(), num_items
 
     def calculate_metric(self, dataobject):
@@ -755,6 +774,10 @@ class GiniIndex(AbstractMetric):
             metric_dict[key] = round(
                 self.get_gini(item_matrix[:, :k], num_items), self.decimal_place
             )
+            
+        max_k = max(self.topk)
+        key = "{}-group@{}".format("giniindex", max_k)
+        metric_dict[key] = self.get_group_gini(item_matrix, num_items)
         return metric_dict
 
     def get_gini(self, item_matrix, num_items):
@@ -775,7 +798,19 @@ class GiniIndex(AbstractMetric):
         gini_index = np.sum((2 * idx - num_items - 1) * sorted_count) / total_num
         gini_index /= num_items
         return gini_index
-
+    
+    def get_group_gini(self, item_matrix, num_items):
+        index = self.map[1:].numpy()
+        num_groups = self.map.max().item() + 1
+        
+        group_ginis = []
+        for g in range(num_groups):
+            user_mask = index == g
+            group_items = item_matrix[user_mask]
+            gini = self.get_gini(group_items, num_items)
+            group_ginis.append(round(gini.item(), self.decimal_place))
+            
+        return group_ginis
 
 class TailPercentage(AbstractMetric):
     r"""TailPercentage_ computes the percentage of long-tail items in recommendation items.

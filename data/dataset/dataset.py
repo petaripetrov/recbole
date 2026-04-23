@@ -2462,26 +2462,36 @@ class Dataset(torch.utils.data.Dataset):
 
         total = 0
         counts = self.user_counter.most_common()
+        
+        user_ids = torch.tensor(self.inter_feat["user_id"].values)
+        item_ids = torch.tensor(self.inter_feat["item_id"].values)
+        
+        is_head = torch.tensor(
+            [i.item() in self.head_set for i in item_ids], dtype=torch.float32
+        )
 
         for _, val in counts:
             total += val
 
-        head = set()
-        head_total = 0.0
-        for key, val in counts:
-            pop_ratio = val / total
-            head_total += pop_ratio
-
-            if head_total >= self.head_ratio:
-                break
-
-            head.add(key)
-
+        user_total = torch.bincount(user_ids, minlength=self.user_num).float()
+        user_head = torch.zeros(self.user_num, dtype=torch.float32).scatter_reduce(
+            dim=0,
+            index=user_ids,
+            src=is_head,
+            reduce="sum",
+            include_self=True
+        )
+        
+        head_ratio_per_user = user_head / user_total.clamp(min=1)
+        
         user_map = torch.zeros(self.user_num, dtype=torch.int64)
-
-        for i in range(self.user_num):
-            if i + 1 in head:
-                user_map[i] = 1
+        num_groups = 5
+        
+        for g in range(num_groups):
+            lower = 1.0 - (g + 1) / num_groups
+            upper = 1.0 - g / num_groups
+            mask = (head_ratio_per_user >= lower) & (head_ratio_per_user < upper)
+            user_map[mask] = g
         
         self.user_map = user_map
             

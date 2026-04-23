@@ -181,8 +181,8 @@ def dict2str(result_dict):
         str: result str
     """
 
-    return "    ".join(
-        [str(metric) + " : " + str(value) for metric, value in result_dict.items()]
+    return "".join(
+        [str(metric) + " : " + str(value) + "\n" for metric, value in result_dict.items()]
     )
 
 
