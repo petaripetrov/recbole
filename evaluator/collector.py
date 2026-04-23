@@ -283,6 +283,9 @@ class Collector(object):
 
         if self.register.need("rec.score"):
             self.data_struct.update_tensor("rec.score", scores_tensor)
+            
+        if self.register.need("rec.users"):
+            self.data_struct.update_tensor("rec.users", interaction["user_id"].to(self.device))
 
         if self.register.need("data.label"):
             self.label_field = self.config["LABEL_FIELD"]
@@ -326,7 +329,7 @@ class Collector(object):
 
             self.data_struct._data_dict[key] = self.data_struct._data_dict[key]
         returned_struct = copy.deepcopy(self.data_struct)
-        for key in ["rec.topk", "rec.meanrank", "rec.score", "rec.items", "data.label"]:
+        for key in ["rec.topk", "rec.meanrank", "rec.score", "rec.items", "rec.users", "data.label"]:
             if key in self.data_struct:
                 del self.data_struct[key]
         return returned_struct

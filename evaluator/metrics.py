@@ -566,6 +566,7 @@ class ItemCoverage(AbstractMetric):
         item_matrix = dataobject.get("rec.items")
         num_items = dataobject.get("data.num_items")
         self.map = dataobject.get("data.user_map")
+        self.users = dataobject.get("rec.users")
         return item_matrix.numpy(), num_items
 
     def calculate_metric(self, dataobject):
@@ -596,7 +597,7 @@ class ItemCoverage(AbstractMetric):
         return unique_count / num_items
     
     def get_group_coverage(self, item_matrix, num_items):
-        index = self.map[1:].numpy()
+        index = self.map[self.users].numpy()
         num_groups = self.map.max().item() + 1
         
         group_coverages = []
@@ -753,7 +754,7 @@ class GiniIndex(AbstractMetric):
 
     metric_type = EvaluatorType.RANKING
     smaller = True
-    metric_need = ["rec.items", "data.num_items", "data.user_map"]
+    metric_need = ["rec.items", "data.num_items", "data.user_map", "rec.users"]
 
     def __init__(self, config):
         super().__init__(config)
@@ -764,6 +765,7 @@ class GiniIndex(AbstractMetric):
         item_matrix = dataobject.get("rec.items")
         num_items = dataobject.get("data.num_items")
         self.map = dataobject.get("data.user_map")
+        self.users = dataobject.get("rec.users")
         return item_matrix.numpy(), num_items
 
     def calculate_metric(self, dataobject):
@@ -800,7 +802,7 @@ class GiniIndex(AbstractMetric):
         return gini_index
     
     def get_group_gini(self, item_matrix, num_items):
-        index = self.map[1:].numpy()
+        index = self.map[self.users].numpy()
         num_groups = self.map.max().item() + 1
         
         group_ginis = []

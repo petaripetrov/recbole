@@ -47,7 +47,7 @@ class AbstractMetric(object):
         avg_res = value.mean(axis=1)
         val_tensor = torch.tensor(avg_res, dtype=torch.float32)
         
-        index = self.map[1:]
+        index = self.map[self.users]
         max_groups = self.map.max().item() + 1
         
         result = torch.zeros(max_groups).scatter_reduce(
@@ -57,6 +57,8 @@ class AbstractMetric(object):
             reduce="mean",
             include_self=True
         )
+        
+        result = [round(res, self.decimal_place) for res in result.tolist()]
         
         return result
 
@@ -70,7 +72,7 @@ class TopkMetric(AbstractMetric):
     """
 
     metric_type = EvaluatorType.RANKING
-    metric_need = ["rec.topk", "data.user_map"]
+    metric_need = ["rec.topk", "data.user_map", "rec.users"]
 
     def __init__(self, config):
         super().__init__(config)
@@ -82,6 +84,7 @@ class TopkMetric(AbstractMetric):
         """
         rec_mat = dataobject.get("rec.topk")
         self.map = dataobject.get("data.user_map")
+        self.users = dataobject.get("rec.users")
         _, K = rec_mat.shape
         max_top_k = max(self.topk)
         topk_idx, _ ,pos_len_list = torch.split(rec_mat, [max_top_k, K - max_top_k - 1, 1], dim=1)

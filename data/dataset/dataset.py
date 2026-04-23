@@ -119,6 +119,7 @@ class Dataset(torch.utils.data.Dataset):
         self.build_protected_map = False
         self.alpha = config["pda_alpha"]
         self.gamma = config["pda_gamma"]
+        self.num_groups = config["user_groups"]
 
         # if config["use_WTD"]:
             # TODO perhaps we should calculate the tail and head sets ahead of time in case WTD is messing with this too much
@@ -2483,17 +2484,23 @@ class Dataset(torch.utils.data.Dataset):
         )
         
         head_ratio_per_user = user_head / user_total.clamp(min=1)
+        sorted_users = torch.argsort(head_ratio_per_user, descending=True)
         
         user_map = torch.zeros(self.user_num, dtype=torch.int64)
-        num_groups = 5
+        total_head = user_head.sum().item()
+        group_threshold = total_head / self.num_groups
+        current_group = 0
+        group_accum = 0.0
         
-        for g in range(num_groups):
-            lower = 1.0 - (g + 1) / num_groups
-            upper = 1.0 - g / num_groups
-            mask = (head_ratio_per_user >= lower) & (head_ratio_per_user < upper)
-            user_map[mask] = g
-        
-        self.user_map = user_map
+        for u_id in sorted_users:
+            user_map[u_id] = current_group
+            group_accum += user_head[u_id].item()
+            
+            if group_accum >= group_threshold and current_group < self.num_groups - 1:
+                current_group += 1
+                group_accum = 0.0
+            
+        self.user_map = torch.cat([torch.zeros(1, dtype=torch.int64), user_map])
             
     def weighted_intervention(self):
         w = self.WTD_w[: self.inter_num]
