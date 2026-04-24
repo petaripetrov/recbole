@@ -239,7 +239,7 @@ def objective_function(config_dict=None, config_file_list=None, saved=True):
     }
 
 
-def load_data_and_model(model_file, root: str, device: str, skip_dataset: bool = False):
+def load_data_and_model(model_file, root: str, device: str, skip_dataset: bool = False, user_groups_override = 5):
     r"""Load filtered dataset, split dataloaders and saved model.
 
     Args:
@@ -262,6 +262,7 @@ def load_data_and_model(model_file, root: str, device: str, skip_dataset: bool =
     data_path = data_path.replace("/scratch/ppetrov1/algorithmic-bias/", root)
     config.final_config_dict["data_path"] = data_path
     config.final_config_dict["device"] = device
+    config.final_config_dict["user_groups"] = user_groups_override
     
     init_seed(config["seed"], config["reproducibility"])
     init_logger(config)
