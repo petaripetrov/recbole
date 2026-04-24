@@ -50,3 +50,7 @@ valid_metric: MRR@20            # (str) The evaluation metric for early stopping
 valid_metric_bigger: True       # (bool) Whether to take a bigger valid metric value as a better result.
 eval_batch_size: 4096           # (int) The evaluation batch size.
 metric_decimal_place: 4         # (int) The decimal place of metric scores.
+
+
+# Algorithmic bias and fairness
+user_groups: 5
